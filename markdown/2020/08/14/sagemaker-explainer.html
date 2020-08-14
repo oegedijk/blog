@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="twitter:card" content="summary" /><!-- Begin Jekyll SEO tag v2.6.1 -->
+<title>Putting SHAP into production with Amazon Sagemaker. | Oege’s blog</title>
+<meta name="generator" content="Jekyll v4.0.0" />
+<meta property="og:title" content="Putting SHAP into production with Amazon Sagemaker." />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="A howto on how to put explainable models to production Amazon Sagemaker." />
+<meta property="og:description" content="A howto on how to put explainable models to production Amazon Sagemaker." />
+<link rel="canonical" href="https://oegedijk.github.io/blog/markdown/2020/08/14/sagemaker-explainer.html" />
+<meta property="og:url" content="https://oegedijk.github.io/blog/markdown/2020/08/14/sagemaker-explainer.html" />
+<meta property="og:site_name" content="Oege’s blog" />
+<meta property="og:type" content="article" />
+<meta property="article:published_time" content="2020-08-14T00:00:00-05:00" />
+<script type="application/ld+json">
+{"description":"A howto on how to put explainable models to production Amazon Sagemaker.","@type":"BlogPosting","url":"https://oegedijk.github.io/blog/markdown/2020/08/14/sagemaker-explainer.html","dateModified":"2020-08-14T00:00:00-05:00","datePublished":"2020-08-14T00:00:00-05:00","headline":"Putting SHAP into production with Amazon Sagemaker.","mainEntityOfPage":{"@type":"WebPage","@id":"https://oegedijk.github.io/blog/markdown/2020/08/14/sagemaker-explainer.html"},"@context":"https://schema.org"}</script>
+<!-- End Jekyll SEO tag -->
+<link rel="stylesheet" href="/blog/assets/css/style.css"><link type="application/atom+xml" rel="alternate" href="https://oegedijk.github.io/blog/feed.xml" title="Oege's blog" /><!-- the google_analytics_id gets auto inserted from the config file -->
+
+
+
+<script>(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)})(window,document,'script','//www.google-analytics.com/analytics.js','ga');ga('create','UA-21800815-2','auto');ga('require','displayfeatures');ga('send','pageview');</script>
+
+<link rel="shortcut icon" type="image/x-icon" href="/blog/images/favicon.ico"><!-- Begin Jekyll SEO tag v2.6.1 -->
+<title>Putting SHAP into production with Amazon Sagemaker. | Oege’s blog</title>
+<meta name="generator" content="Jekyll v4.0.0" />
+<meta property="og:title" content="Putting SHAP into production with Amazon Sagemaker." />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="A howto on how to put explainable models to production Amazon Sagemaker." />
+<meta property="og:description" content="A howto on how to put explainable models to production Amazon Sagemaker." />
+<link rel="canonical" href="https://oegedijk.github.io/blog/markdown/2020/08/14/sagemaker-explainer.html" />
+<meta property="og:url" content="https://oegedijk.github.io/blog/markdown/2020/08/14/sagemaker-explainer.html" />
+<meta property="og:site_name" content="Oege’s blog" />
+<meta property="og:type" content="article" />
+<meta property="article:published_time" content="2020-08-14T00:00:00-05:00" />
+<script type="application/ld+json">
+{"description":"A howto on how to put explainable models to production Amazon Sagemaker.","@type":"BlogPosting","url":"https://oegedijk.github.io/blog/markdown/2020/08/14/sagemaker-explainer.html","dateModified":"2020-08-14T00:00:00-05:00","datePublished":"2020-08-14T00:00:00-05:00","headline":"Putting SHAP into production with Amazon Sagemaker.","mainEntityOfPage":{"@type":"WebPage","@id":"https://oegedijk.github.io/blog/markdown/2020/08/14/sagemaker-explainer.html"},"@context":"https://schema.org"}</script>
+<!-- End Jekyll SEO tag -->
+
+<link href="https://unpkg.com/@primer/css/dist/primer.css" rel="stylesheet" />
+<link rel="stylesheet" href="//use.fontawesome.com/releases/v5.0.7/css/all.css"><link type="application/atom+xml" rel="alternate" href="https://oegedijk.github.io/blog/feed.xml" title="Oege's blog" /><!-- the google_analytics_id gets auto inserted from the config file -->
+
+
+
+<script>(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)})(window,document,'script','//www.google-analytics.com/analytics.js','ga');ga('create','UA-21800815-2','auto');ga('require','displayfeatures');ga('send','pageview');</script>
+
+
+
+<script>
+function wrap_img(fn) {
+    if (document.attachEvent ? document.readyState === "complete" : document.readyState !== "loading") {
+        var elements = document.querySelectorAll(".post img");
+        Array.prototype.forEach.call(elements, function(el, i) {
+            if (el.getAttribute("title") && (el.className != "emoji")) {
+                const caption = document.createElement('figcaption');
+                var node = document.createTextNode(el.getAttribute("title"));
+                caption.appendChild(node);
+                const wrapper = document.createElement('figure');
+                wrapper.className = 'image';
+                el.parentNode.insertBefore(wrapper, el);
+                el.parentNode.removeChild(el);
+                wrapper.appendChild(el);
+                wrapper.appendChild(caption);
+            }
+        });
+    } else { document.addEventListener('DOMContentLoaded', fn); }
+}
+window.onload = wrap_img;
+</script>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function(){
+    // add link icon to anchor tags
+    var elem = document.querySelectorAll(".anchor-link")
+    elem.forEach(e => (e.innerHTML = '<i class="fas fa-link fa-xs"></i>'));
+    });
+</script>
+</head>
+<body><header class="site-header">
+
+  <div class="wrapper"><a class="site-title" rel="author" href="/blog/">Oege&#39;s blog</a><nav class="site-nav">
+        <input type="checkbox" id="nav-trigger" class="nav-trigger" />
+        <label for="nav-trigger">
+          <span class="menu-icon">
+            <svg viewBox="0 0 18 15" width="18px" height="15px">
+              <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.032C17.335,0,18,0.665,18,1.484L18,1.484z M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.032C17.335,6.031,18,6.696,18,7.516L18,7.516z M18,13.516C18,14.335,17.335,15,16.516,15H1.484 C0.665,15,0,14.335,0,13.516l0,0c0-0.82,0.665-1.483,1.484-1.483h15.032C17.335,12.031,18,12.695,18,13.516L18,13.516z"/>
+            </svg>
+          </span>
+        </label>
+
+        <div class="trigger"><a class="page-link" href="/blog/about/">About Me</a><a class="page-link" href="/blog/search/">Search</a><a class="page-link" href="/blog/categories/">Tags</a></div>
+      </nav></div>
+</header>
+<main class="page-content" aria-label="Content">
+      <div class="wrapper">
+        <article class="post h-entry" itemscope itemtype="http://schema.org/BlogPosting">
+
+  <header class="post-header">
+    <h1 class="post-title p-name" itemprop="name headline">Putting SHAP into production with Amazon Sagemaker.</h1><p class="page-description">A howto on how to put explainable models to production Amazon Sagemaker.</p><p class="post-meta post-meta-title"><time class="dt-published" datetime="2020-08-14T00:00:00-05:00" itemprop="datePublished">
+        Aug 14, 2020
+      </time>
+       • <span class="read-time" title="Estimated read time">
+    
+    
+      10 min read
+    
+</span></p>
+
+    
+      <p class="category-tags"><i class="fas fa-tags category-tags-icon"></i></i> 
+      
+        <a class="category-tags-link" href="/blog/categories/#markdown">markdown</a>
+        
+      
+      </p>
+    
+
+    </header>
+
+  <div class="post-content e-content" itemprop="articleBody">
+    <ul class="section-nav">
+<li class="toc-entry toc-h1"><a href="#deploying-explainable-models-to-aws-sagemaker">Deploying explainable models to AWS Sagemaker</a>
+<ul>
+<li class="toc-entry toc-h2"><a href="#github-repository">Github Repository</a></li>
+<li class="toc-entry toc-h2"><a href="#notebook">notebook</a></li>
+<li class="toc-entry toc-h2"><a href="#ecr-container">ECR Container</a>
+<ul>
+<li class="toc-entry toc-h4"><a href="#setting-ecr-permissions">setting ECR permissions</a></li>
+<li class="toc-entry toc-h4"><a href="#attach-additional-policies">Attach additional policies:</a></li>
+<li class="toc-entry toc-h4"><a href="#installing--docker-credential-ecr-login">Installing  docker-credential-ecr-login</a></li>
+<li class="toc-entry toc-h3"><a href="#dockerfile">Dockerfile</a>
+<ul>
+<li class="toc-entry toc-h4"><a href="#dockerimage-deployment-helper-class">DockerImage deployment helper class</a></li>
+</ul>
+</li>
+<li class="toc-entry toc-h3"><a href="#getting-scikit-learn-image-uri">Getting scikit-learn image URI</a></li>
+<li class="toc-entry toc-h3"><a href="#building-custom-image-based-on-scikit-learn-image">Building custom image based on scikit-learn image</a></li>
+<li class="toc-entry toc-h3"><a href="#training-the-model">Training the Model</a>
+<ul>
+<li class="toc-entry toc-h4"><a href="#sagemaker-estimator">Sagemaker Estimator</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toc-entry toc-h2"><a href="#inference">Inference</a>
+<ul>
+<li class="toc-entry toc-h3"><a href="#fitting-the-model">Fitting the model</a></li>
+<li class="toc-entry toc-h3"><a href="#deploying-the-endpoint">deploying the endpoint</a></li>
+<li class="toc-entry toc-h3"><a href="#test-the-endpoint">Test the endpoint</a></li>
+</ul>
+</li>
+<li class="toc-entry toc-h2"><a href="#lambda--api">lambda + api</a></li>
+<li class="toc-entry toc-h2"><a href="#test-api">test api</a></li>
+</ul>
+</li>
+</ul><h1 id="deploying-explainable-models-to-aws-sagemaker">
+<a class="anchor" href="#deploying-explainable-models-to-aws-sagemaker" aria-hidden="true"><span class="octicon octicon-link"></span></a>Deploying explainable models to AWS Sagemaker</h1>
+
+<p>Nowadays fairness and transparancy are becoming more and more important for 
+machine learning applications. Especially when your machine learning model will
+be used to make decisions with a large effect on people’s wellbeing such as
+acceptance or rejections of loan applications, fraud investigations, etc.</p>
+
+<p>Building some unscrutable black-box deep learning algorithms and claiming it has
+an accuracy of over 90% is no longer good enough. Models and model predictions 
+should be explainable to both regulators and end users.</p>
+
+<p>However with modern approaches such as SHAP values (Lundberg et al 2017; 2018), 
+the contributions of each feature to the final predictions can be calculated, 
+thus providing an  explanation for how the model used the inputs to reach
+its final prediction. The challenge is 
+however to integrate such SHAP values into a production system, in order to 
+provide transparent model decisions to stakeholders, decision-makers, regulators 
+and customers alike.</p>
+
+<p>Here we will be focusing on getting our model into production using Amazon Sagemaker.</p>
+
+<p>It turns out that the <code class="highlighter-rouge">shap</code> library is not included by default in <code class="highlighter-rouge">sagemaker</code> 
+estimator docker images, so it will not work out of the box.
+Which means that in order to provide shap values as
+part of your output, you have to build a custom docker container. Which is doable
+but a little but more complicated than usual.</p>
+
+<p>The other part that is different from standard models is constructing the response
+payload to include shap values. But that should be the easy part.</p>
+
+<h2 id="github-repository">
+<a class="anchor" href="#github-repository" aria-hidden="true"><span class="octicon octicon-link"></span></a>Github Repository</h2>
+
+<p>All the code and examples mentioned in this blog post are hosted at 
+<a href="https://github.com/oegedijk/sagemaker-creditscore-explainer">https://github.com/oegedijk/sagemaker-creditscore-explainer</a></p>
+
+<h2 id="notebook">
+<a class="anchor" href="#notebook" aria-hidden="true"><span class="octicon octicon-link"></span></a>notebook</h2>
+
+<p>It is easiest to deploy sagemaker containers, models and endpoints from within
+a sagemaker notebook instance. So attach the git repository <a href="https://github.com/oegedijk/sagemaker-creditscore-explainer">https://github.com/oegedijk/sagemaker-creditscore-explainer</a> to your sagemaker notebook instance.</p>
+
+<p>More info on how to attach a git repo to your notebook instance here: <a href="https://docs.aws.amazon.com/sagemaker/latest/dg/nbi-git-repo.html">https://docs.aws.amazon.com/sagemaker/latest/dg/nbi-git-repo.html</a></p>
+
+<p>After you have connected to the repo, go to the <code class="highlighter-rouge">sagemaker/notebooks</code> directory
+and open <code class="highlighter-rouge">sagemaker_explainer.ipynb</code>.</p>
+
+<h2 id="ecr-container">
+<a class="anchor" href="#ecr-container" aria-hidden="true"><span class="octicon octicon-link"></span></a>ECR Container</h2>
+
+<p>Given that we will be deploying a custom docker container, we need to make sure we 
+have a ECR docker registry set up.</p>
+
+<p>You can go the the AWS console, find <code class="highlighter-rouge">Elastic Container Registry</code>
+and create one in your AWS region. For example, to create one in <code class="highlighter-rouge">eu-central-1</code> go 
+to https://eu-central-1.console.aws.amazon.com/ecr/repositories?region=eu-central-1)</p>
+
+<p>The name I gave to my repository is <code class="highlighter-rouge">sagemaker-explainer</code>.</p>
+
+<h4 id="setting-ecr-permissions">
+<a class="anchor" href="#setting-ecr-permissions" aria-hidden="true"><span class="octicon octicon-link"></span></a>setting ECR permissions</h4>
+
+<p>In order to create a custom docker container for our model we need to 
+add <code class="highlighter-rouge">AmazonEC2ContainerRegistryFullAccess</code> policy to our notebook.</p>
+
+<p>In the sagemaker console:</p>
+
+<ul>
+  <li>click on notebook instances</li>
+  <li>click on the notebook instance that you are using</li>
+  <li>go to Permissions and encryption</li>
+  <li>click on the <code class="highlighter-rouge">IAM role ARN</code>
+</li>
+  <li>click on ‘Attach Policies’</li>
+  <li>find <code class="highlighter-rouge">AmazonEC2ContainerRegistryFullAccess</code>
+</li>
+  <li>add it to the notebook.</li>
+</ul>
+
+<h4 id="attach-additional-policies">
+<a class="anchor" href="#attach-additional-policies" aria-hidden="true"><span class="octicon octicon-link"></span></a>Attach additional policies:</h4>
+
+<p>You may have to add some additional permissions to your notebook policies, namely 
+<code class="highlighter-rouge">"ecr:GetDownloadUrlForLayer"</code>, <code class="highlighter-rouge">"ecr:BatchGetImage"</code> and <code class="highlighter-rouge">"ecr:BatchCheckLayerAvailability"</code>.</p>
+
+<p>You can either edit these manually, or paste the following json:</p>
+
+<div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">{</span><span class="w">
+    </span><span class="nl">"Version"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2008-10-17"</span><span class="p">,</span><span class="w">
+    </span><span class="nl">"Statement"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+        </span><span class="p">{</span><span class="w">
+            </span><span class="nl">"Sid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"allowSageMakerToPull"</span><span class="p">,</span><span class="w">
+            </span><span class="nl">"Effect"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Allow"</span><span class="p">,</span><span class="w">
+            </span><span class="nl">"Action"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+                </span><span class="s2">"ecr:GetDownloadUrlForLayer"</span><span class="p">,</span><span class="w">
+                </span><span class="s2">"ecr:BatchGetImage"</span><span class="p">,</span><span class="w">
+                </span><span class="s2">"ecr:BatchCheckLayerAvailability"</span><span class="w">
+            </span><span class="p">],</span><span class="w">
+            </span><span class="nl">"Resource"</span><span class="p">:</span><span class="w"> </span><span class="s2">"*"</span><span class="w">
+        </span><span class="p">}</span><span class="w">
+    </span><span class="p">]</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+
+<h4 id="installing--docker-credential-ecr-login">
+<a class="anchor" href="#installing--docker-credential-ecr-login" aria-hidden="true"><span class="octicon octicon-link"></span></a>Installing  <code class="highlighter-rouge">docker-credential-ecr-login</code>
+</h4>
+
+<p>In order to log into ECR from our sagemaker notebook, we need to install
+a tool called <code class="highlighter-rouge">docker-credential-ecr-login</code>. We download and install it inside
+out Sagemaker notebook with:</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>!sudo wget -P /usr/bin https://amazon-ecr-credential-helper-releases.s3.us-east-2.amazonaws.com/0.4.0/linux-amd64/docker-credential-ecr-login
+</code></pre></div></div>
+
+<p>and</p>
+
+<div class="highlighter-rouge"><div class="highlight"><pre class="highlight"><code>!sudo chmod +x /usr/bin/docker-credential-ecr-login
+</code></pre></div></div>
+
+<h3 id="dockerfile">
+<a class="anchor" href="#dockerfile" aria-hidden="true"><span class="octicon octicon-link"></span></a>Dockerfile</h3>
+
+<p>The <code class="highlighter-rouge">Dockerfile</code> to create our custom container is quite straightforward and
+can be found in <code class="highlighter-rouge">sagemaker/container/Dockerfile</code>:</p>
+
+<pre><code class="language-Dockerfile">ARG SCIKIT_LEARN_IMAGE
+FROM $SCIKIT_LEARN_IMAGE
+
+COPY requirements.txt /requirements.txt
+RUN pip install --no-cache -r /requirements.txt &amp;&amp; \
+    rm /requirements.txt
+</code></pre>
+
+<p>So basically we take a scikit learn image (defined by a parameter) and
+then install additional requirements into it (basically <code class="highlighter-rouge">joblib</code> and <code class="highlighter-rouge">shap</code>).</p>
+
+<h4 id="dockerimage-deployment-helper-class">
+<a class="anchor" href="#dockerimage-deployment-helper-class" aria-hidden="true"><span class="octicon octicon-link"></span></a>DockerImage deployment helper class</h4>
+
+<p>In order to build and push our custom image we make use of this nice 
+helper class:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">ecr_client</span> <span class="o">=</span> <span class="n">boto3</span><span class="o">.</span><span class="n">client</span><span class="p">(</span><span class="s">"ecr"</span><span class="p">,</span> <span class="n">region_name</span><span class="o">=</span><span class="n">AWS_REGION</span><span class="p">)</span>
+<span class="n">docker_client</span> <span class="o">=</span> <span class="n">docker</span><span class="o">.</span><span class="n">APIClient</span><span class="p">()</span>
+
+<span class="k">class</span> <span class="nc">DockerImage</span><span class="p">:</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">registry</span><span class="p">,</span> <span class="n">repository_name</span><span class="p">,</span> <span class="n">tag</span><span class="o">=</span><span class="s">"latest"</span><span class="p">,</span>
+                <span class="n">docker_config_filepath</span><span class="o">=</span><span class="s">'/home/ec2-user/.docker/config.json'</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">registry</span> <span class="o">=</span> <span class="n">registry</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">repository_name</span> <span class="o">=</span> <span class="n">repository_name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">docker_config_filepath</span> <span class="o">=</span> <span class="n">docker_config_filepath</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tag</span> <span class="o">=</span> <span class="n">tag</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_check_credential_manager</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_configure_credentials</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s">"{}/{}:{}"</span><span class="o">.</span><span class="nb">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">registry</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">repository_name</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tag</span><span class="p">)</span>
+
+    <span class="o">@</span><span class="nb">property</span>
+    <span class="k">def</span> <span class="nf">repository</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s">"{}/{}"</span><span class="o">.</span><span class="nb">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">registry</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">repository_name</span><span class="p">)</span>
+
+    <span class="o">@</span><span class="nb">property</span>
+    <span class="k">def</span> <span class="nf">short_name</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">repository_name</span>
+
+    <span class="o">@</span><span class="nb">staticmethod</span>
+    <span class="k">def</span> <span class="nf">_check_credential_manager</span><span class="p">():</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+                <span class="p">[</span><span class="s">"docker-credential-ecr-login"</span><span class="p">,</span> <span class="s">"version"</span><span class="p">],</span>
+                <span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">DEVNULL</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">except</span> <span class="nb">Exception</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="nb">Exception</span><span class="p">(</span>
+                <span class="s">"Couldn't run 'docker-credential-ecr-login'. "</span>
+                <span class="s">"Make sure it is installed and configured correctly."</span>
+            <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_configure_credentials</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">docker_config_filepath</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">docker_config_filepath</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">docker_config_filepath</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">docker_config_filepath</span><span class="p">,</span> <span class="s">"r"</span><span class="p">)</span> <span class="k">as</span> <span class="n">openfile</span><span class="p">:</span>
+                <span class="n">docker_config</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">openfile</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">docker_config</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">if</span> <span class="s">"credHelpers"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">docker_config</span><span class="p">:</span>
+            <span class="n">docker_config</span><span class="p">[</span><span class="s">"credHelpers"</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">docker_config</span><span class="p">[</span><span class="s">"credHelpers"</span><span class="p">][</span><span class="bp">self</span><span class="o">.</span><span class="n">registry</span><span class="p">]</span> <span class="o">=</span> <span class="s">"ecr-login"</span>
+        <span class="n">docker_config_filepath</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">exist_ok</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">parents</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">docker_config_filepath</span><span class="p">,</span> <span class="s">"w"</span><span class="p">)</span> <span class="k">as</span> <span class="n">openfile</span><span class="p">:</span>
+            <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">docker_config</span><span class="p">,</span> <span class="n">openfile</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">build</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dockerfile</span><span class="p">,</span> <span class="n">buildargs</span><span class="p">):</span>
+        <span class="n">path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">dockerfile</span><span class="p">)</span><span class="o">.</span><span class="n">parent</span>
+        <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">docker_client</span><span class="o">.</span><span class="n">build</span><span class="p">(</span>
+            <span class="n">path</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">path</span><span class="p">),</span>
+            <span class="n">buildargs</span><span class="o">=</span><span class="n">buildargs</span><span class="p">,</span>
+            <span class="n">tag</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">repository_name</span><span class="p">,</span>
+            <span class="n">decode</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span>
+        <span class="p">):</span>
+            <span class="k">if</span> <span class="s">"error"</span> <span class="ow">in</span> <span class="n">line</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="nb">Exception</span><span class="p">(</span><span class="n">line</span><span class="p">[</span><span class="s">"error"</span><span class="p">])</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">print</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">push</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">docker_client</span><span class="o">.</span><span class="n">tag</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">repository_name</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">repository</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tag</span><span class="p">,</span> <span class="n">force</span><span class="o">=</span><span class="bp">True</span>
+        <span class="p">)</span>
+        <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">docker_client</span><span class="o">.</span><span class="n">push</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">repository</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tag</span><span class="p">,</span> <span class="n">stream</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">decode</span><span class="o">=</span><span class="bp">True</span>
+        <span class="p">):</span>
+            <span class="k">print</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+</code></pre></div></div>
+
+<h3 id="getting-scikit-learn-image-uri">
+<a class="anchor" href="#getting-scikit-learn-image-uri" aria-hidden="true"><span class="octicon octicon-link"></span></a>Getting scikit-learn image URI</h3>
+
+<p>So now we can get our scikit-learn image:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">def</span> <span class="nf">scikit_learn_image</span><span class="p">():</span>
+    <span class="n">registry</span> <span class="o">=</span> <span class="n">sagemaker</span><span class="o">.</span><span class="n">fw_registry</span><span class="o">.</span><span class="n">registry</span><span class="p">(</span>
+        <span class="n">region_name</span><span class="o">=</span><span class="n">AWS_REGION</span><span class="p">,</span> <span class="n">framework</span><span class="o">=</span><span class="s">"scikit-learn"</span>
+    <span class="p">)</span>
+    <span class="n">repository_name</span> <span class="o">=</span> <span class="s">"sagemaker-scikit-learn"</span>
+    <span class="n">tag</span> <span class="o">=</span> <span class="s">"0.20.0-cpu-py3"</span>
+    <span class="k">return</span> <span class="n">DockerImage</span><span class="p">(</span><span class="n">registry</span><span class="p">,</span> <span class="n">repository_name</span><span class="p">,</span> <span class="n">tag</span><span class="p">)</span>
+
+<span class="n">sklearn_image</span> <span class="o">=</span> <span class="n">scikit_learn_image</span><span class="p">()</span>
+</code></pre></div></div>
+
+<h3 id="building-custom-image-based-on-scikit-learn-image">
+<a class="anchor" href="#building-custom-image-based-on-scikit-learn-image" aria-hidden="true"><span class="octicon octicon-link"></span></a>Building custom image based on scikit-learn image</h3>
+
+<p>And use that to build and push our custom image:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">def</span> <span class="nf">custom_image</span><span class="p">(</span><span class="n">aws_account_id</span><span class="p">,</span> <span class="n">aws_region</span><span class="p">,</span> <span class="n">repository_name</span><span class="p">,</span> <span class="n">tag</span><span class="o">=</span><span class="s">"latest"</span><span class="p">):</span>
+    <span class="n">ecr_registry</span> <span class="o">=</span> <span class="n">f</span><span class="s">"{aws_account_id}.dkr.ecr.{aws_region}.amazonaws.com"</span>
+    <span class="k">return</span> <span class="n">DockerImage</span><span class="p">(</span><span class="n">ecr_registry</span><span class="p">,</span> <span class="n">repository_name</span><span class="p">,</span> <span class="n">tag</span><span class="p">)</span>
+
+<span class="n">custom_image</span> <span class="o">=</span> <span class="n">custom_image</span><span class="p">(</span><span class="n">AWS_ACCOUNT_ID</span><span class="p">,</span> <span class="n">AWS_REGION</span><span class="p">,</span> <span class="n">ECR_REPOSITORY_NAME</span><span class="p">)</span>
+
+<span class="n">dockerfile</span> <span class="o">=</span> <span class="n">Path</span><span class="o">.</span><span class="n">cwd</span><span class="p">()</span><span class="o">.</span><span class="n">parent</span> <span class="o">/</span> <span class="s">"container"</span> <span class="o">/</span> <span class="s">"Dockerfile"</span>
+
+<span class="n">custom_image</span><span class="o">.</span><span class="n">build</span><span class="p">(</span>
+    <span class="n">dockerfile</span><span class="o">=</span><span class="n">dockerfile</span><span class="p">,</span>
+    <span class="n">buildargs</span><span class="o">=</span><span class="p">{</span><span class="s">'SCIKIT_LEARN_IMAGE'</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">sklearn_image</span><span class="p">)}</span>
+<span class="p">)</span>
+
+<span class="n">custom_image</span><span class="o">.</span><span class="n">push</span><span class="p">()</span>
+</code></pre></div></div>
+
+<p>This will take some time, but by the end you should have a custom training
+image with shap installed. The URI will be along the lines of</p>
+
+<p>‘AWS_ACCOUNT_ID###.dkr.ecr.AWS_REGION###.amazonaws.com/sagemaker-explainer:latest’</p>
+
+<h3 id="training-the-model">
+<a class="anchor" href="#training-the-model" aria-hidden="true"><span class="octicon octicon-link"></span></a>Training the Model</h3>
+
+<h4 id="sagemaker-estimator">
+<a class="anchor" href="#sagemaker-estimator" aria-hidden="true"><span class="octicon octicon-link"></span></a>Sagemaker Estimator</h4>
+
+<p>Now that we have our custom training image, we can make use of the builtin 
+Sagemaker <code class="highlighter-rouge">SKLearn</code> estimator, as long as we make sure to point it towards 
+our custom image:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">estimator</span> <span class="o">=</span> <span class="n">SKLearn</span><span class="p">(</span>
+    <span class="n">image_name</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">custom_image</span><span class="p">),</span>
+    <span class="n">entry_point</span><span class="o">=</span><span class="s">'entry_point.py'</span><span class="p">,</span>
+    <span class="n">source_dir</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">source_dir</span><span class="p">),</span>
+    <span class="n">hyperparameters</span><span class="o">=</span><span class="n">hyperparameters</span><span class="p">,</span>
+    <span class="n">role</span><span class="o">=</span><span class="n">role</span><span class="p">,</span>
+    <span class="n">train_instance_count</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">train_instance_type</span><span class="o">=</span><span class="s">'ml.m5.2xlarge'</span><span class="p">,</span> 
+    <span class="n">output_path</span><span class="o">=</span><span class="n">output_path</span><span class="p">,</span>
+    <span class="n">code_location</span><span class="o">=</span><span class="n">output_path</span><span class="p">,</span>
+<span class="p">)</span>
+</code></pre></div></div>
+
+<p>When training a custom model on sagemaker you have to define a training 
+directory (<code class="highlighter-rouge">source_dir</code>) and a file that serves as the entry point 
+(<code class="highlighter-rouge">entry_point</code>). This file must contain
+the <code class="highlighter-rouge">train_fn</code> and the <code class="highlighter-rouge">model_fn</code>, <code class="highlighter-rouge">predict_fn</code>, <code class="highlighter-rouge">input_fn</code>, and <code class="highlighter-rouge">output_fn</code> 
+for the inference later on.</p>
+
+<p>The training entry point can be found in <code class="highlighter-rouge">sagemaker/src/entry_point.py</code>:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+
+<span class="c1"># import training function
+</span><span class="kn">from</span> <span class="nn">model</span> <span class="kn">import</span> <span class="n">parse_args</span><span class="p">,</span> <span class="n">train_fn</span>
+
+<span class="c1"># import deployment functions
+</span><span class="kn">from</span> <span class="nn">model</span> <span class="kn">import</span> <span class="n">model_fn</span><span class="p">,</span> <span class="n">predict_fn</span><span class="p">,</span> <span class="n">input_fn</span><span class="p">,</span> <span class="n">output_fn</span>
+
+<span class="k">if</span> <span class="n">__name__</span> <span class="o">==</span> <span class="s">"__main__"</span><span class="p">:</span>
+    <span class="n">args</span> <span class="o">=</span> <span class="n">parse_args</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
+    <span class="n">train_fn</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p>The training function itself is located in <code class="highlighter-rouge">sagemaker/src/model.py</code>. The main
+difference with a regular model is that we also fit a <code class="highlighter-rouge">shap.TreeExplainer</code> to
+the model and store this in our model directory:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code>
+<span class="kn">import</span> <span class="nn">argparse</span>
+<span class="kn">import</span> <span class="nn">joblib</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">from</span> <span class="nn">pathlib</span> <span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">warnings</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="n">np</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="n">pd</span>
+
+<span class="kn">import</span> <span class="nn">shap</span>
+
+<span class="kn">from</span> <span class="nn">sklearn.base</span> <span class="kn">import</span> <span class="n">BaseEstimator</span><span class="p">,</span> <span class="n">TransformerMixin</span>
+<span class="kn">from</span> <span class="nn">sklearn.impute</span> <span class="kn">import</span> <span class="n">SimpleImputer</span>
+
+<span class="kn">from</span> <span class="nn">sklearn.ensemble</span> <span class="kn">import</span> <span class="n">RandomForestClassifier</span>
+
+
+<span class="k">class</span> <span class="nc">DFImputer</span><span class="p">(</span><span class="n">BaseEstimator</span><span class="p">,</span> <span class="n">TransformerMixin</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">strategy</span><span class="o">=</span><span class="s">"median"</span><span class="p">,</span> <span class="n">fill_value</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">imputer</span> <span class="o">=</span> <span class="n">SimpleImputer</span><span class="p">(</span><span class="n">strategy</span><span class="o">=</span><span class="n">strategy</span><span class="p">,</span> <span class="n">fill_value</span><span class="o">=</span><span class="n">fill_value</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fitted</span> <span class="o">=</span> <span class="bp">False</span>
+    
+    <span class="k">def</span> <span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_feature_names</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">columns</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">imputer</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fitted</span> <span class="o">=</span> <span class="bp">True</span>
+        <span class="k">return</span> <span class="bp">self</span>
+    
+    <span class="k">def</span> <span class="nf">transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">):</span>
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">fitted</span><span class="p">,</span> <span class="s">"Need to cal .fit(X) function first!"</span>
+        <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">imputer</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span>
+                <span class="n">X</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_feature_names</span><span class="p">]),</span> 
+                <span class="n">columns</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_feature_names</span><span class="p">,</span> 
+                <span class="n">index</span><span class="o">=</span><span class="n">X</span><span class="o">.</span><span class="n">index</span>
+            <span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">)</span>
+    
+    <span class="k">def</span> <span class="nf">get_feature_names</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_feature_names</span>
+
+<span class="k">class</span> <span class="nc">NumpyEncoder</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">JSONEncoder</span><span class="p">):</span>
+    <span class="s">"""converts numpy arrays to lists before they get json encoded"""</span>
+    <span class="k">def</span> <span class="nf">default</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">obj</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">obj</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">JSONEncoder</span><span class="o">.</span><span class="n">default</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">obj</span><span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">parse_args</span><span class="p">(</span><span class="n">sys_args</span><span class="p">):</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">()</span>
+
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s">"--model-dir"</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">"SM_MODEL_DIR"</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s">"--train-data"</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">"SM_CHANNEL_TRAIN_DATA"</span><span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s">"--test-data"</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s">"SM_CHANNEL_TEST_DATA"</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">args</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_known_args</span><span class="p">(</span><span class="n">sys_args</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">args</span>
+
+
+<span class="k">def</span> <span class="nf">train_fn</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+    <span class="k">print</span><span class="p">(</span><span class="s">"loading data"</span><span class="p">)</span>
+    <span class="n">train_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">train_data</span> <span class="o">+</span> <span class="s">"/train.csv"</span><span class="p">,</span> <span class="n">engine</span><span class="o">=</span><span class="s">'python'</span><span class="p">)</span>
+    <span class="n">test_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">test_data</span><span class="o">+</span> <span class="s">"/test.csv"</span><span class="p">,</span> <span class="n">engine</span><span class="o">=</span><span class="s">'python'</span><span class="p">)</span>
+    
+    <span class="n">TARGET</span> <span class="o">=</span> <span class="s">'SeriousDlqin2yrs'</span>
+    <span class="n">X_train</span> <span class="o">=</span> <span class="n">train_df</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">TARGET</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">y_train</span> <span class="o">=</span> <span class="n">train_df</span><span class="p">[</span><span class="n">TARGET</span><span class="p">]</span>
+    <span class="n">X_test</span> <span class="o">=</span> <span class="n">test_df</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">TARGET</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">y_test</span> <span class="o">=</span> <span class="n">test_df</span><span class="p">[</span><span class="n">TARGET</span><span class="p">]</span>
+
+    <span class="k">print</span><span class="p">(</span><span class="s">"Imputing missing values"</span><span class="p">)</span>
+    <span class="n">imputer</span> <span class="o">=</span> <span class="n">DFImputer</span><span class="p">(</span><span class="n">strategy</span><span class="o">=</span><span class="s">'median'</span><span class="p">)</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">)</span>
+    <span class="n">X_train</span> <span class="o">=</span> <span class="n">imputer</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">X_train</span><span class="p">)</span>
+    <span class="n">X_test</span> <span class="o">=</span> <span class="n">imputer</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
+
+    <span class="k">print</span><span class="p">(</span><span class="s">"Building model..."</span><span class="p">)</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">RandomForestClassifier</span><span class="p">(</span><span class="n">n_estimators</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">max_depth</span><span class="o">=</span><span class="mi">6</span><span class="p">,</span> <span class="n">max_leaf_nodes</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span>
+    <span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">)</span>
+    <span class="n">explainer</span> <span class="o">=</span> <span class="n">shap</span><span class="o">.</span><span class="n">TreeExplainer</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+
+    <span class="k">print</span><span class="p">(</span><span class="s">"Saving artifacts..."</span><span class="p">)</span>
+    <span class="n">model_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">model_dir</span><span class="p">)</span>
+    <span class="n">model_dir</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">exist_ok</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">parents</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+
+    <span class="n">joblib</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">imputer</span><span class="p">,</span> <span class="nb">open</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">model_dir</span> <span class="o">/</span> <span class="s">"imputer.joblib"</span><span class="p">),</span> <span class="s">"wb"</span><span class="p">))</span>
+    <span class="n">joblib</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="nb">open</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">model_dir</span> <span class="o">/</span> <span class="s">"model.joblib"</span><span class="p">),</span> <span class="s">"wb"</span><span class="p">))</span>
+    <span class="n">joblib</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">explainer</span><span class="p">,</span> <span class="nb">open</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">model_dir</span> <span class="o">/</span> <span class="s">"explainer.joblib"</span><span class="p">),</span> <span class="s">"wb"</span><span class="p">))</span>
+
+</code></pre></div></div>
+
+<h2 id="inference">
+<a class="anchor" href="#inference" aria-hidden="true"><span class="octicon octicon-link"></span></a>Inference</h2>
+
+<p>For inference we have to define <code class="highlighter-rouge">model_fn</code> to load our model artifacts. Here
+we have to make sure we also load the <code class="highlighter-rouge">explainer.joblib</code>.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">def</span> <span class="nf">model_fn</span><span class="p">(</span><span class="n">model_dir</span><span class="p">):</span>
+    <span class="s">"""loads artifacts from model_dir and bundle them in a model_assets dict"""</span>
+    <span class="n">model_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">model_dir</span><span class="p">)</span>
+    <span class="n">imputer</span><span class="o">=</span> <span class="n">joblib</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">model_dir</span> <span class="o">/</span> <span class="s">"imputer.joblib"</span><span class="p">)</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">joblib</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">model_dir</span> <span class="o">/</span> <span class="s">"model.joblib"</span><span class="p">)</span>
+    <span class="n">explainer</span> <span class="o">=</span> <span class="n">joblib</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">model_dir</span> <span class="o">/</span> <span class="s">"explainer.joblib"</span><span class="p">)</span>
+
+    <span class="n">explainer</span> <span class="o">=</span> <span class="n">shap</span><span class="o">.</span><span class="n">TreeExplainer</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+
+    <span class="n">model_assets</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s">"imputer"</span><span class="p">:</span> <span class="n">imputer</span><span class="p">,</span>
+        <span class="s">"model"</span><span class="p">:</span> <span class="n">model</span><span class="p">,</span>
+        <span class="s">"explainer"</span><span class="p">:</span> <span class="n">explainer</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="n">model_assets</span>
+</code></pre></div></div>
+
+<p>The function <code class="highlighter-rouge">input_fn</code> reads the JSON input and returns a dictionary with a 
+pandas DataFrame.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">def</span> <span class="nf">input_fn</span><span class="p">(</span><span class="n">request_body_str</span><span class="p">,</span> <span class="n">request_content_type</span><span class="p">):</span>
+    <span class="s">"""takes input json and returns a request dict with 'data' key"""</span>
+    <span class="k">assert</span> <span class="n">request_content_type</span> <span class="o">==</span> <span class="s">"application/json"</span><span class="p">,</span> \
+        <span class="s">"content_type must be 'application/json'"</span>
+
+    <span class="n">json_obj</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">request_body_str</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">json_obj</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="c1"># sometimes you have to unpack the json string twice for some reason. 
+</span>        <span class="n">json_obj</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">json_obj</span><span class="p">)</span>
+
+    <span class="n">request</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s">'df'</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">json_obj</span><span class="p">)</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="n">request</span>
+</code></pre></div></div>
+
+<p>The <code class="highlighter-rouge">predict_fn</code> uses the input dataframe in <code class="highlighter-rouge">request</code> and the model assets
+to calculate the predictions and shap values.</p>
+
+<p>We construct a return dictionary that includes both the prediction, 
+the shap base value (comparable to an intercept in regular OLS), 
+and the shap values per feature:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code>
+
+<span class="k">def</span> <span class="nf">predict_fn</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="n">model_assets</span><span class="p">):</span>
+    <span class="s">"""
+    takes a request dict and model_assets dict and returns a response dict
+    with 'prediction', 'shap_base' and 'shap_values'
+    """</span> 
+    <span class="k">print</span><span class="p">(</span><span class="n">f</span><span class="s">"data: {request['df']}"</span><span class="p">)</span>
+    <span class="n">features</span> <span class="o">=</span> <span class="n">model_assets</span><span class="p">[</span><span class="s">"imputer"</span><span class="p">]</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">request</span><span class="p">[</span><span class="s">'df'</span><span class="p">])</span>
+
+    <span class="n">preds</span> <span class="o">=</span> <span class="n">model_assets</span><span class="p">[</span><span class="s">"model"</span><span class="p">]</span><span class="o">.</span><span class="n">predict_proba</span><span class="p">(</span><span class="n">features</span><span class="p">)[:,</span> <span class="mi">1</span><span class="p">]</span>
+
+    <span class="n">expected_value</span> <span class="o">=</span> <span class="n">model_assets</span><span class="p">[</span><span class="s">"explainer"</span><span class="p">]</span><span class="o">.</span><span class="n">expected_value</span>
+
+    <span class="k">if</span> <span class="n">expected_value</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="mi">1</span><span class="p">,):</span>
+        <span class="n">expected_value</span> <span class="o">=</span> <span class="n">expected_value</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">expected_value</span> <span class="o">=</span> <span class="n">expected_value</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+
+    <span class="n">shap_values</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">model_assets</span><span class="p">[</span><span class="s">"explainer"</span><span class="p">]</span><span class="o">.</span><span class="n">shap_values</span><span class="p">(</span><span class="n">features</span><span class="p">)[</span><span class="mi">1</span><span class="p">])</span>
+
+    <span class="n">response</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">response</span><span class="p">[</span><span class="s">'prediction'</span><span class="p">]</span> <span class="o">=</span> <span class="n">preds</span>
+    <span class="n">response</span><span class="p">[</span><span class="s">'shap_base'</span><span class="p">]</span> <span class="o">=</span> <span class="n">expected_value</span>
+    <span class="n">response</span><span class="p">[</span><span class="s">'shap_values'</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">v</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">features</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">tolist</span><span class="p">(),</span> <span class="n">shap_values</span><span class="o">.</span><span class="n">tolist</span><span class="p">())}</span>
+    <span class="k">return</span> <span class="n">response</span>
+</code></pre></div></div>
+
+<p>And finally <code class="highlighter-rouge">output_fn</code> returns the response in JSON format:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">def</span> <span class="nf">output_fn</span><span class="p">(</span><span class="n">response</span><span class="p">,</span> <span class="n">response_content_type</span><span class="p">):</span>
+    <span class="s">"""takes a response dict and returns a json string of response"""</span>
+    <span class="k">assert</span> <span class="p">(</span>
+        <span class="n">response_content_type</span> <span class="o">==</span> <span class="s">"application/json"</span>
+    <span class="p">),</span> <span class="s">"accept must be 'application/json'"</span>
+    <span class="n">response_body_str</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">response</span><span class="p">,</span> <span class="n">cls</span><span class="o">=</span><span class="n">NumpyEncoder</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">response_body_str</span>
+</code></pre></div></div>
+
+<h3 id="fitting-the-model">
+<a class="anchor" href="#fitting-the-model" aria-hidden="true"><span class="octicon octicon-link"></span></a>Fitting the model</h3>
+
+<p>So now we simply fit our model as usual with:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">estimator</span><span class="o">.</span><span class="n">fit</span><span class="p">({</span><span class="s">'train_data'</span><span class="p">:</span> <span class="n">train_data</span><span class="p">,</span> <span class="s">'test_data'</span><span class="p">:</span> <span class="n">test_data</span><span class="p">})</span>
+</code></pre></div></div>
+
+<h3 id="deploying-the-endpoint">
+<a class="anchor" href="#deploying-the-endpoint" aria-hidden="true"><span class="octicon octicon-link"></span></a>deploying the endpoint</h3>
+
+<p>And deploy it with:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">estimator</span><span class="o">.</span><span class="n">deploy</span><span class="p">(</span>
+    <span class="n">endpoint_name</span><span class="o">=</span><span class="s">"credit-explainer"</span><span class="p">,</span>
+    <span class="n">initial_instance_count</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> 
+    <span class="n">instance_type</span><span class="o">=</span><span class="s">'ml.c4.xlarge'</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p>(this can take some time)</p>
+
+<h3 id="test-the-endpoint">
+<a class="anchor" href="#test-the-endpoint" aria-hidden="true"><span class="octicon octicon-link"></span></a>Test the endpoint</h3>
+
+<p>We build a predictor with appropriate json serializers baked in and test the 
+endpoint:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">sagemaker.predictor</span> <span class="kn">import</span> <span class="n">RealTimePredictor</span>
+<span class="kn">from</span> <span class="nn">sagemaker.predictor</span> <span class="kn">import</span> <span class="n">json_serializer</span><span class="p">,</span> <span class="n">json_deserializer</span><span class="p">,</span> <span class="n">CONTENT_TYPE_JSON</span>
+
+<span class="n">predictor</span> <span class="o">=</span> <span class="n">RealTimePredictor</span><span class="p">(</span>
+    <span class="n">endpoint</span><span class="o">=</span><span class="n">endpoint_name</span><span class="p">,</span>
+    <span class="n">sagemaker_session</span><span class="o">=</span><span class="n">sagemaker_session</span><span class="p">,</span>
+    <span class="n">serializer</span><span class="o">=</span><span class="n">json_serializer</span><span class="p">,</span>
+    <span class="n">deserializer</span><span class="o">=</span><span class="n">json_deserializer</span><span class="p">,</span>
+    <span class="n">content_type</span><span class="o">=</span><span class="s">"application/json"</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">predictor</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">test_df</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">to_json</span><span class="p">(</span><span class="n">orient</span><span class="o">=</span><span class="s">'records'</span><span class="p">))</span>
+</code></pre></div></div>
+
+<p>Output should be something like:</p>
+
+<div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">{</span><span class="err">'prediction':</span><span class="w"> </span><span class="p">[</span><span class="mf">0.020315580737022686</span><span class="p">],</span><span class="w">
+ </span><span class="err">'shap_base':</span><span class="w"> </span><span class="mf">0.06050333333333335</span><span class="p">,</span><span class="w">
+ </span><span class="err">'shap_values':</span><span class="w"> </span><span class="p">{</span><span class="err">'RevolvingUtilizationOfUnsecuredLines':</span><span class="w"> </span><span class="p">[</span><span class="mf">-0.018875482250995595</span><span class="p">],</span><span class="w">
+  </span><span class="err">'age':</span><span class="w"> </span><span class="p">[</span><span class="mf">0.0026035737687252584</span><span class="p">],</span><span class="w">
+  </span><span class="err">'NumberOfTime</span><span class="mi">30-59</span><span class="err">DaysPastDueNotWorse':</span><span class="w"> </span><span class="p">[</span><span class="mf">-0.007295913630249845</span><span class="p">],</span><span class="w">
+  </span><span class="err">'DebtRatio':</span><span class="w"> </span><span class="p">[</span><span class="mf">-0.001166559449290446</span><span class="p">],</span><span class="w">
+  </span><span class="err">'MonthlyIncome':</span><span class="w"> </span><span class="p">[</span><span class="mf">0.00046746497026006246</span><span class="p">],</span><span class="w">
+  </span><span class="err">'NumberOfOpenCreditLinesAndLoans':</span><span class="w"> </span><span class="p">[</span><span class="mf">-0.00012379074985687487</span><span class="p">],</span><span class="w">
+  </span><span class="err">'NumberOfTimes</span><span class="mi">90</span><span class="err">DaysLate':</span><span class="w"> </span><span class="p">[</span><span class="mf">-0.010730724822367846</span><span class="p">],</span><span class="w">
+  </span><span class="err">'NumberRealEstateLoansOrLines':</span><span class="w"> </span><span class="p">[</span><span class="mf">-0.00029942272129598825</span><span class="p">],</span><span class="w">
+  </span><span class="err">'NumberOfTime</span><span class="mi">60-89</span><span class="err">DaysPastDueNotWorse':</span><span class="w"> </span><span class="p">[</span><span class="mf">-0.004091473195545041</span><span class="p">],</span><span class="w">
+  </span><span class="err">'NumberOfDependents':</span><span class="w"> </span><span class="p">[</span><span class="mf">-0.0006754245156943097</span><span class="p">]}}</span><span class="w">
+</span></code></pre></div></div>
+
+<h2 id="lambda--api">
+<a class="anchor" href="#lambda--api" aria-hidden="true"><span class="octicon octicon-link"></span></a>lambda + api</h2>
+
+<p>Now all that is left to do is set up a lambda function to forward to API call to
+your endpoint (Sagemaker endpoints can only be reached from within the AWS ecosystem, so you 
+need to put a lambda function in between), and then get a public facing URL from
+Gateway API.</p>
+
+<p><a href="https://medium.com/analytics-vidhya/invoke-an-amazon-sagemaker-endpoint-using-aws-lambda-83ff1a9f5443">This tutorial</a>
+explains the various steps and configurations quite well, so just follow the steps.</p>
+
+<p>In our case we simply forward the event payload onward without any repackaging,
+so our <code class="highlighter-rouge">lambda_handler</code> is quite straightforward. I added a bunch of prints so 
+that we can check our logs in case anything goes wrong.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">io</span>
+<span class="kn">import</span> <span class="nn">boto3</span>
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">csv</span>
+
+<span class="c1"># grab environment variables
+</span><span class="n">ENDPOINT_NAME</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s">'ENDPOINT_NAME'</span><span class="p">]</span>
+<span class="n">runtime</span><span class="o">=</span> <span class="n">boto3</span><span class="o">.</span><span class="n">client</span><span class="p">(</span><span class="s">'runtime.sagemaker'</span><span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">lambda_handler</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">context</span><span class="p">):</span>
+    <span class="k">print</span><span class="p">(</span><span class="s">"Received event: "</span> <span class="o">+</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">event</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">))</span>
+
+    <span class="n">response</span> <span class="o">=</span> <span class="n">runtime</span><span class="o">.</span><span class="n">invoke_endpoint</span><span class="p">(</span><span class="n">EndpointName</span><span class="o">=</span><span class="n">ENDPOINT_NAME</span><span class="p">,</span>
+                                        <span class="n">ContentType</span><span class="o">=</span><span class="s">'application/json'</span><span class="p">,</span>
+                                        <span class="n">Body</span><span class="o">=</span><span class="n">event</span><span class="p">)</span>
+
+    <span class="k">print</span><span class="p">(</span><span class="s">"raw response: "</span><span class="p">,</span> <span class="n">response</span><span class="p">)</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">response</span><span class="p">[</span><span class="s">'Body'</span><span class="p">]</span><span class="o">.</span><span class="n">read</span><span class="p">()</span><span class="o">.</span><span class="n">decode</span><span class="p">())</span>
+    <span class="k">print</span><span class="p">(</span><span class="s">"decoded result: "</span><span class="p">,</span> <span class="n">result</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">result</span>
+</code></pre></div></div>
+
+<h2 id="test-api">
+<a class="anchor" href="#test-api" aria-hidden="true"><span class="octicon octicon-link"></span></a>test api</h2>
+
+<p>After setting up the Gateway API you should have a public facing API url so we can
+test our explainable model endpoint:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># take a single sample row and convert it to JSON:
+</span><span class="n">sample_json</span><span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="n">to_json</span><span class="p">(</span><span class="n">orient</span><span class="o">=</span><span class="s">'records'</span><span class="p">)</span>
+
+<span class="c1"># define the header
+</span><span class="n">header</span> <span class="o">=</span> <span class="p">{</span><span class="s">'Content-Type'</span><span class="p">:</span> <span class="s">'application/json'</span><span class="p">,</span> <span class="s">'Accept'</span><span class="p">:</span> <span class="s">'application/json'</span><span class="p">}</span>
+
+<span class="c1"># API url, copy your own here:
+</span><span class="n">api_url</span> <span class="o">=</span> <span class="s">"https://#########.execute-api.eu-central-1.amazonaws.com/test/credit-explainer"</span>
+
+
+<span class="n">resp</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="n">api_url</span><span class="p">,</span> \
+                    <span class="n">data</span><span class="o">=</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">sample_json</span><span class="p">),</span> \
+                    <span class="n">headers</span><span class="o">=</span><span class="n">header</span><span class="p">)</span>
+
+<span class="k">print</span><span class="p">(</span><span class="n">resp</span><span class="o">.</span><span class="n">json</span><span class="p">())</span>
+</code></pre></div></div>
+
+<p>And the result should again be something like this:</p>
+
+<div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">{</span><span class="err">'prediction':</span><span class="w"> </span><span class="p">[</span><span class="mf">0.3045473967302875</span><span class="p">],</span><span class="w">
+ </span><span class="err">'shap_base':</span><span class="w"> </span><span class="mf">0.06050333333333335</span><span class="p">,</span><span class="w">
+ </span><span class="err">'shap_values':</span><span class="w"> </span><span class="p">{</span><span class="err">'RevolvingUtilizationOfUnsecuredLines':</span><span class="w"> </span><span class="p">[</span><span class="mf">0.017002446159576922</span><span class="p">],</span><span class="w">
+  </span><span class="err">'age':</span><span class="w"> </span><span class="p">[</span><span class="mf">0.006427313815255611</span><span class="p">],</span><span class="w">
+  </span><span class="err">'NumberOfTime</span><span class="mi">30-59</span><span class="err">DaysPastDueNotWorse':</span><span class="w"> </span><span class="p">[</span><span class="mf">-0.007124554453726655</span><span class="p">],</span><span class="w">
+  </span><span class="err">'DebtRatio':</span><span class="w"> </span><span class="p">[</span><span class="mf">-0.006844505153423333</span><span class="p">],</span><span class="w">
+  </span><span class="err">'MonthlyIncome':</span><span class="w"> </span><span class="p">[</span><span class="mf">-0.019672520587649577</span><span class="p">],</span><span class="w">
+  </span><span class="err">'NumberOfOpenCreditLinesAndLoans':</span><span class="w"> </span><span class="p">[</span><span class="mf">-0.010014011659840212</span><span class="p">],</span><span class="w">
+  </span><span class="err">'NumberOfTimes</span><span class="mi">90</span><span class="err">DaysLate':</span><span class="w"> </span><span class="p">[</span><span class="mf">0.288998818519516</span><span class="p">],</span><span class="w">
+  </span><span class="err">'NumberRealEstateLoansOrLines':</span><span class="w"> </span><span class="p">[</span><span class="mf">-0.0007571802810589933</span><span class="p">],</span><span class="w">
+  </span><span class="err">'NumberOfTime</span><span class="mi">60-89</span><span class="err">DaysPastDueNotWorse':</span><span class="w"> </span><span class="p">[</span><span class="mf">-0.022098932417397806</span><span class="p">],</span><span class="w">
+  </span><span class="err">'NumberOfDependents':</span><span class="w"> </span><span class="p">[</span><span class="mf">-0.001872810544298378</span><span class="p">]}}</span><span class="w">
+</span></code></pre></div></div>
+
+<p>In this case the customer was predicted to have 30% chance of a loan delinquency
+in the next two years, mostly based on the number of times that they have been more 
+than 90 days late in their repayments.</p>
+
+<p>Now you can put take this output and embed it in a dashboard where human
+decision-makers or end customers have access to it!</p>
+
+<p>Good luck building your own explainable machine learning models in AWS Sagemaker!</p>
+
+
+  </div><a class="u-url" href="/blog/markdown/2020/08/14/sagemaker-explainer.html" hidden></a>
+</article>
+      </div>
+    </main><footer class="site-footer h-card">
+  <data class="u-url" href="/blog/"></data>
+
+  <div class="wrapper">
+
+    <div class="footer-col-wrapper">
+      <div class="footer-col">
+        <p class="feed-subscribe">
+          <a href="/blog/feed.xml">
+            <svg class="svg-icon orange">
+              <use xlink:href="/blog/assets/minima-social-icons.svg#rss"></use>
+            </svg><span>Subscribe</span>
+          </a>
+        </p>
+      </div>
+      <div class="footer-col">
+        <p>A blog about data science, explainable AI, python tricks and more</p>
+      </div>
+    </div>
+
+    <div class="social-links"><ul class="social-media-list"><li><a rel="me" href="https://github.com/oegedijk" title="oegedijk"><svg class="svg-icon grey"><use xlink:href="/blog/assets/minima-social-icons.svg#github"></use></svg></a></li><li><a rel="me" href="https://twitter.com/oegedijk" title="oegedijk"><svg class="svg-icon grey"><use xlink:href="/blog/assets/minima-social-icons.svg#twitter"></use></svg></a></li></ul>
+</div>
+
+  </div>
+
+</footer>
+</body>
+
+</html>

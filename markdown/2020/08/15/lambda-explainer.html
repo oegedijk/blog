@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="twitter:card" content="summary" /><!-- Begin Jekyll SEO tag v2.6.1 -->
+<title>Putting SHAP into production with Amazon Lambda. | Oege’s blog</title>
+<meta name="generator" content="Jekyll v4.0.0" />
+<meta property="og:title" content="Putting SHAP into production with Amazon Lambda." />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="A howto on how to put explainable models to production Amazon Lambda" />
+<meta property="og:description" content="A howto on how to put explainable models to production Amazon Lambda" />
+<link rel="canonical" href="https://oegedijk.github.io/blog/markdown/2020/08/15/lambda-explainer.html" />
+<meta property="og:url" content="https://oegedijk.github.io/blog/markdown/2020/08/15/lambda-explainer.html" />
+<meta property="og:site_name" content="Oege’s blog" />
+<meta property="og:type" content="article" />
+<meta property="article:published_time" content="2020-08-15T00:00:00-05:00" />
+<script type="application/ld+json">
+{"description":"A howto on how to put explainable models to production Amazon Lambda","@type":"BlogPosting","url":"https://oegedijk.github.io/blog/markdown/2020/08/15/lambda-explainer.html","dateModified":"2020-08-15T00:00:00-05:00","datePublished":"2020-08-15T00:00:00-05:00","headline":"Putting SHAP into production with Amazon Lambda.","mainEntityOfPage":{"@type":"WebPage","@id":"https://oegedijk.github.io/blog/markdown/2020/08/15/lambda-explainer.html"},"@context":"https://schema.org"}</script>
+<!-- End Jekyll SEO tag -->
+<link rel="stylesheet" href="/blog/assets/css/style.css"><link type="application/atom+xml" rel="alternate" href="https://oegedijk.github.io/blog/feed.xml" title="Oege's blog" /><!-- the google_analytics_id gets auto inserted from the config file -->
+
+
+
+<script>(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)})(window,document,'script','//www.google-analytics.com/analytics.js','ga');ga('create','UA-21800815-2','auto');ga('require','displayfeatures');ga('send','pageview');</script>
+
+<link rel="shortcut icon" type="image/x-icon" href="/blog/images/favicon.ico"><!-- Begin Jekyll SEO tag v2.6.1 -->
+<title>Putting SHAP into production with Amazon Lambda. | Oege’s blog</title>
+<meta name="generator" content="Jekyll v4.0.0" />
+<meta property="og:title" content="Putting SHAP into production with Amazon Lambda." />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="A howto on how to put explainable models to production Amazon Lambda" />
+<meta property="og:description" content="A howto on how to put explainable models to production Amazon Lambda" />
+<link rel="canonical" href="https://oegedijk.github.io/blog/markdown/2020/08/15/lambda-explainer.html" />
+<meta property="og:url" content="https://oegedijk.github.io/blog/markdown/2020/08/15/lambda-explainer.html" />
+<meta property="og:site_name" content="Oege’s blog" />
+<meta property="og:type" content="article" />
+<meta property="article:published_time" content="2020-08-15T00:00:00-05:00" />
+<script type="application/ld+json">
+{"description":"A howto on how to put explainable models to production Amazon Lambda","@type":"BlogPosting","url":"https://oegedijk.github.io/blog/markdown/2020/08/15/lambda-explainer.html","dateModified":"2020-08-15T00:00:00-05:00","datePublished":"2020-08-15T00:00:00-05:00","headline":"Putting SHAP into production with Amazon Lambda.","mainEntityOfPage":{"@type":"WebPage","@id":"https://oegedijk.github.io/blog/markdown/2020/08/15/lambda-explainer.html"},"@context":"https://schema.org"}</script>
+<!-- End Jekyll SEO tag -->
+
+<link href="https://unpkg.com/@primer/css/dist/primer.css" rel="stylesheet" />
+<link rel="stylesheet" href="//use.fontawesome.com/releases/v5.0.7/css/all.css"><link type="application/atom+xml" rel="alternate" href="https://oegedijk.github.io/blog/feed.xml" title="Oege's blog" /><!-- the google_analytics_id gets auto inserted from the config file -->
+
+
+
+<script>(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)})(window,document,'script','//www.google-analytics.com/analytics.js','ga');ga('create','UA-21800815-2','auto');ga('require','displayfeatures');ga('send','pageview');</script>
+
+
+
+<script>
+function wrap_img(fn) {
+    if (document.attachEvent ? document.readyState === "complete" : document.readyState !== "loading") {
+        var elements = document.querySelectorAll(".post img");
+        Array.prototype.forEach.call(elements, function(el, i) {
+            if (el.getAttribute("title") && (el.className != "emoji")) {
+                const caption = document.createElement('figcaption');
+                var node = document.createTextNode(el.getAttribute("title"));
+                caption.appendChild(node);
+                const wrapper = document.createElement('figure');
+                wrapper.className = 'image';
+                el.parentNode.insertBefore(wrapper, el);
+                el.parentNode.removeChild(el);
+                wrapper.appendChild(el);
+                wrapper.appendChild(caption);
+            }
+        });
+    } else { document.addEventListener('DOMContentLoaded', fn); }
+}
+window.onload = wrap_img;
+</script>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function(){
+    // add link icon to anchor tags
+    var elem = document.querySelectorAll(".anchor-link")
+    elem.forEach(e => (e.innerHTML = '<i class="fas fa-link fa-xs"></i>'));
+    });
+</script>
+</head>
+<body><header class="site-header">
+
+  <div class="wrapper"><a class="site-title" rel="author" href="/blog/">Oege&#39;s blog</a><nav class="site-nav">
+        <input type="checkbox" id="nav-trigger" class="nav-trigger" />
+        <label for="nav-trigger">
+          <span class="menu-icon">
+            <svg viewBox="0 0 18 15" width="18px" height="15px">
+              <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.032C17.335,0,18,0.665,18,1.484L18,1.484z M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.032C17.335,6.031,18,6.696,18,7.516L18,7.516z M18,13.516C18,14.335,17.335,15,16.516,15H1.484 C0.665,15,0,14.335,0,13.516l0,0c0-0.82,0.665-1.483,1.484-1.483h15.032C17.335,12.031,18,12.695,18,13.516L18,13.516z"/>
+            </svg>
+          </span>
+        </label>
+
+        <div class="trigger"><a class="page-link" href="/blog/about/">About Me</a><a class="page-link" href="/blog/search/">Search</a><a class="page-link" href="/blog/categories/">Tags</a></div>
+      </nav></div>
+</header>
+<main class="page-content" aria-label="Content">
+      <div class="wrapper">
+        <article class="post h-entry" itemscope itemtype="http://schema.org/BlogPosting">
+
+  <header class="post-header">
+    <h1 class="post-title p-name" itemprop="name headline">Putting SHAP into production with Amazon Lambda.</h1><p class="page-description">A howto on how to put explainable models to production Amazon Lambda</p><p class="post-meta post-meta-title"><time class="dt-published" datetime="2020-08-15T00:00:00-05:00" itemprop="datePublished">
+        Aug 15, 2020
+      </time>
+       • <span class="read-time" title="Estimated read time">
+    
+    
+      5 min read
+    
+</span></p>
+
+    
+      <p class="category-tags"><i class="fas fa-tags category-tags-icon"></i></i> 
+      
+        <a class="category-tags-link" href="/blog/categories/#markdown">markdown</a>
+        
+      
+      </p>
+    
+
+    </header>
+
+  <div class="post-content e-content" itemprop="articleBody">
+    <ul class="section-nav">
+<li class="toc-entry toc-h1"><a href="#deploying-explainable-models-to-aws-lambda-using-zappa">Deploying explainable models to AWS Lambda using Zappa</a></li>
+<li class="toc-entry toc-h1"><a href="#zappa-basics">Zappa basics</a>
+<ul>
+<li class="toc-entry toc-h2"><a href="#zappa-tutorial">Zappa tutorial</a></li>
+<li class="toc-entry toc-h2"><a href="#deploying-a-ml-api-including-shap">Deploying a ML API including shap</a></li>
+<li class="toc-entry toc-h2"><a href="#using-makefile">Using Makefile</a></li>
+<li class="toc-entry toc-h2"><a href="#conclusion">Conclusion</a></li>
+<li class="toc-entry toc-h2"><a href="#appendix">Appendix</a>
+<ul>
+<li class="toc-entry toc-h3"><a href="#makefile">Makefile</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul><h1 id="deploying-explainable-models-to-aws-lambda-using-zappa">
+<a class="anchor" href="#deploying-explainable-models-to-aws-lambda-using-zappa" aria-hidden="true"><span class="octicon octicon-link"></span></a>Deploying explainable models to AWS Lambda using Zappa</h1>
+
+<p>Nowadays fairness and transparancy are becoming more and more important for 
+machine learning applications. Especially when your machine learning model will
+be used to make decisions with a large effect on people’s wellbeing such as
+acceptance or rejections of loan applications, fraud investigations, etc.</p>
+
+<p>Building some unscrutable black-box deep learning algorithms and claiming it has
+an accuracy of over 90% is no longer good enough. Models and model predictions 
+should be explainable to both regulators and end users.</p>
+
+<p>However with modern approaches such as SHAP values (Lundberg et al 2017; 2018), 
+the contributions of each feature to the final predictions can be calculated, 
+thus providing an  explanation for how the model used the inputs to reach
+its final prediction. The challenge is 
+however to integrate such SHAP values into a production system, in order to 
+provide transparent model decisions to stakeholders, decision-makers, regulators 
+and customers alike.</p>
+
+<p>Here we will be focusing on getting our model into production using Amazon Lambda 
+functions and the awesome <code class="highlighter-rouge">zappa</code> package. The advantage of lambda functions
+is that they are serverless: they don’t need to be hosted on always-on infrastructure
+like for example sagemaker endpoints (or your own EC2 deployment or on premise
+solution). Only when they get called does amazon find a server to run the
+specific code on. The downside is that there are a lot more restructions on
+the size of the code and dependencies and infrastructure. (for example no GPUs 
+sadly for deep learning deployments). All dependencies also have to be 
+compatible with a particular flavor of Amazon Linux.</p>
+
+<p>Deploying and properly configuring an AWS lambda function and Gateway API (to
+get a public face URL) can be quite tricky
+and time consuming. Luckily there is an amazing almost magical package that simplifies all
+of this for python projects called (Zappa)[https://github.com/Miserlou/Zappa].</p>
+
+<p>Zappa takes care of all the configuration behind the scenes: bundling up all the code
+and dependencies, setting up S3 buckets to store artifacts, 
+setting up the lambda function, configuring the Gateway API, setting up logging, 
+and just giving you nice API url in the end.</p>
+
+<p>For standard <code class="highlighter-rouge">scikit-learn</code> models zappa provides lambda compatible versions
+of <code class="highlighter-rouge">numpy</code>, <code class="highlighter-rouge">pandas</code> and <code class="highlighter-rouge">scikit-learn</code>. However in order to deploy a model
+that also returns <code class="highlighter-rouge">shap</code> values, we have to build our environment inside a docker
+container as you will see.</p>
+
+<h1 id="zappa-basics">
+<a class="anchor" href="#zappa-basics" aria-hidden="true"><span class="octicon octicon-link"></span></a>Zappa basics</h1>
+
+<p>The basics steps of deploying with zappa are:</p>
+
+<ol>
+  <li>Create a virtual environment</li>
+  <li>Install zappa into this venv along with other dependencies</li>
+  <li>Call <code class="highlighter-rouge">zappa init</code> or provide your own zappa_settings.json</li>
+  <li>call <code class="highlighter-rouge">zappa deploy</code>.</li>
+</ol>
+
+<p>Zappa automatically bundles up all packages in your venv in a zip file and sends
+it to lambda to be deployed. If the package is too large for lambda limits (50MB zipped),
+you can set <code class="highlighter-rouge">"slim_handler": true</code>, and zappa will only deploy a loader package to lambda,
+store the actual package in an S3 bucket, and then download the package to lambda 
+as needed in order to bypass the limit.</p>
+
+<h2 id="zappa-tutorial">
+<a class="anchor" href="#zappa-tutorial" aria-hidden="true"><span class="octicon octicon-link"></span></a>Zappa tutorial</h2>
+<p>I highly recommend reading through this tutorial to find out what <code class="highlighter-rouge">zappa</code> does,
+how to configure your permissions and deploy your first toy API to AWS lambda:
+(https://pythonforundergradengineers.com/deploy-serverless-web-app-aws-lambda-zappa.html)
+[https://pythonforundergradengineers.com/deploy-serverless-web-app-aws-lambda-zappa.html]</p>
+
+<p>Especially setting up the right permissions can be quite challenging. 
+After following this tutorial you should have a user set up with the right
+credentials and saved the credentials to <code class="highlighter-rouge">~/.aws/credentials</code>.</p>
+
+<h2 id="deploying-a-ml-api-including-shap">
+<a class="anchor" href="#deploying-a-ml-api-including-shap" aria-hidden="true"><span class="octicon octicon-link"></span></a>Deploying a ML API including shap</h2>
+
+<p>When deploying to lambda you need to make sure that all packages are compatible 
+with the Lambda AWS Linux environment. For standard packages such as <code class="highlighter-rouge">numpy</code>, 
+<code class="highlighter-rouge">pandas</code> and <code class="highlighter-rouge">scikit-learn</code>, <code class="highlighter-rouge">zappa</code> already has pre-built packages prepared 
+and will automatically substitute these for you. (told you it was magic!)</p>
+
+<p>However <code class="highlighter-rouge">shap</code> is not one of those so you have to build compatible versions yourself.
+The easiest way to do that is to install them inside a lambda compatible docker
+container.</p>
+
+<p>You can start from the <code class="highlighter-rouge">lambci/lambda:build-python3.7</code> image, and then run it in 
+interactive mode. To have acces to your credentials you can mount the <code class="highlighter-rouge">~/.aws</code>
+ directory to <code class="highlighter-rouge">/root/.aws</code>:</p>
+
+<p><code class="highlighter-rouge">docker run --rm -it -v $(pwd):/var/task -v ~/.aws:/root/.aws lambci/lambda:build-python3.7 /bin/bash</code></p>
+
+<p>Then you create the venv: <code class="highlighter-rouge">python -m venv lambda_env</code>, activate it:
+<code class="highlighter-rouge">source lambda_env/bin/activate</code>, and install the dependencies <code class="highlighter-rouge">pip install -r requirements.txt</code>.</p>
+
+<p>The next step is to create a <code class="highlighter-rouge">zappa_settings.json</code> file by calling <code class="highlighter-rouge">zappa init</code>. 
+The default options are fine. You then open the newly created <code class="highlighter-rouge">zappa_settings.json</code> 
+and add the following lines:</p>
+
+<div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nl">"slim_handler"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="err">,</span><span class="w"> </span><span class="err">//</span><span class="w"> </span><span class="err">for</span><span class="w"> </span><span class="err">large</span><span class="w"> </span><span class="err">packages,</span><span class="w"> </span><span class="err">store</span><span class="w"> </span><span class="err">package</span><span class="w"> </span><span class="err">in</span><span class="w"> </span><span class="err">S</span><span class="mi">3</span><span class="w">
+</span><span class="nl">"aws_region"</span><span class="p">:</span><span class="w"> </span><span class="s2">"eu-west-1"</span><span class="err">,</span><span class="w"> </span><span class="err">//</span><span class="w"> </span><span class="err">or</span><span class="w"> </span><span class="err">whatever</span><span class="w"> </span><span class="err">your</span><span class="w"> </span><span class="err">aws</span><span class="w"> </span><span class="err">region</span><span class="w"> </span><span class="err">is</span><span class="w">
+</span><span class="nl">"keep_warm"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="err">,</span><span class="w"> </span><span class="err">//</span><span class="w"> </span><span class="err">if</span><span class="w"> </span><span class="err">you</span><span class="w"> </span><span class="err">want</span><span class="w"> </span><span class="err">to</span><span class="w"> </span><span class="err">disable</span><span class="w"> </span><span class="err">to</span><span class="w"> </span><span class="err">default</span><span class="w"> </span><span class="err">keep</span><span class="w"> </span><span class="err">warm</span><span class="w"> </span><span class="err">callback</span><span class="w">
+</span></code></pre></div></div>
+
+<p>If instead of calling <code class="highlighter-rouge">zappa init</code> you use the <code class="highlighter-rouge">zappa_settings.json</code> file in 
+this repo, then also make sure to change the <code class="highlighter-rouge">"s3_bucket"</code> to something uniquely yours.</p>
+
+<p>Finally you call <code class="highlighter-rouge">zappa deploy dev</code> (assuming you named the task <code class="highlighter-rouge">dev</code>), and your api 
+should get deployed. Like magic!</p>
+
+<p>Note the url provided by GatewayAPI at the end, and go test your API!</p>
+
+<h2 id="using-makefile">
+<a class="anchor" href="#using-makefile" aria-hidden="true"><span class="octicon octicon-link"></span></a>Using Makefile</h2>
+
+<p>In this project is also an example Makefile so that you can simply call 
+<code class="highlighter-rouge">make env model deploy</code>to build and deploy the model, and then 
+<code class="highlighter-rouge">make undeploy clean</code> to undeploy the project and clean up.</p>
+
+<h2 id="conclusion">
+<a class="anchor" href="#conclusion" aria-hidden="true"><span class="octicon octicon-link"></span></a>Conclusion</h2>
+
+<p>Setting up lambda functins using zappa can be a breeze as long as you
+build your environment in a proper lambda compatible environment.</p>
+
+<h2 id="appendix">
+<a class="anchor" href="#appendix" aria-hidden="true"><span class="octicon octicon-link"></span></a>Appendix</h2>
+
+<h3 id="makefile">
+<a class="anchor" href="#makefile" aria-hidden="true"><span class="octicon octicon-link"></span></a>Makefile</h3>
+
+<p>Below the contents of the <code class="highlighter-rouge">Makefile</code>:</p>
+
+<pre><code class="language-Makefile">all: help
+
+help:           ## Show this help.
+	@fgrep -h "##" $(MAKEFILE_LIST) | fgrep -v fgrep | sed -e 's/\\$$//' | sed -e 's/##//'
+
+env:  			## build lambci compatible venv and install requirements.txt
+	docker run --rm -v $(CURDIR):/var/task -v ~/.aws:/root/.aws lambci/lambda:build-python3.7 /bin/bash -c " \
+	python -m venv lambda_env &amp;&amp; \
+	source lambda_env/bin/activate &amp;&amp; \
+	pip install -r requirements.txt &amp;&amp; \
+    zappa init"
+
+model: 	## build the model artifacts: model.pkl, imputer.pkl, explainer.pkl
+	docker run --rm -v $(CURDIR):/var/task -v ~/.aws:/root/.aws lambci/lambda:build-python3.7 /bin/bash -c " \
+	source lambda_env/bin/activate &amp;&amp; \
+	python build_model_artifacts.py"
+
+deploy:			## activate venv and deploy
+	docker run --rm -v $(CURDIR):/var/task -v ~/.aws:/root/.aws lambci/lambda:build-python3.7 /bin/bash -c "\
+	source lambda_env/bin/activate &amp;&amp; \
+	zappa deploy dev"
+
+update:			## activate venv and update deployment
+	docker run --rm -v $(CURDIR):/var/task -v ~/.aws:/root/.aws lambci/lambda:build-python3.7 /bin/bash -c "\
+	source lambda_env/bin/activate &amp;&amp; \
+	zappa update dev --yes"
+
+undeploy:		## activate venv and undeploy
+	docker run --rm -v $(CURDIR):/var/task -v ~/.aws:/root/.aws lambci/lambda:build-python3.7 /bin/bash -c "\
+	source lambda_env/bin/activate &amp;&amp; \
+	zappa undeploy dev --yes"
+
+interactive:
+	docker run --rm -it -v $(CURDIR):/var/task -v ~/.aws:/root/.aws lambci/lambda:build-python3.7 /bin/bash 
+
+clean: 
+	rm -r lambda_env
+	rm pkl/*
+</code></pre>
+
+  </div><a class="u-url" href="/blog/markdown/2020/08/15/lambda-explainer.html" hidden></a>
+</article>
+      </div>
+    </main><footer class="site-footer h-card">
+  <data class="u-url" href="/blog/"></data>
+
+  <div class="wrapper">
+
+    <div class="footer-col-wrapper">
+      <div class="footer-col">
+        <p class="feed-subscribe">
+          <a href="/blog/feed.xml">
+            <svg class="svg-icon orange">
+              <use xlink:href="/blog/assets/minima-social-icons.svg#rss"></use>
+            </svg><span>Subscribe</span>
+          </a>
+        </p>
+      </div>
+      <div class="footer-col">
+        <p>A blog about data science, explainable AI, python tricks and more</p>
+      </div>
+    </div>
+
+    <div class="social-links"><ul class="social-media-list"><li><a rel="me" href="https://github.com/oegedijk" title="oegedijk"><svg class="svg-icon grey"><use xlink:href="/blog/assets/minima-social-icons.svg#github"></use></svg></a></li><li><a rel="me" href="https://twitter.com/oegedijk" title="oegedijk"><svg class="svg-icon grey"><use xlink:href="/blog/assets/minima-social-icons.svg#twitter"></use></svg></a></li></ul>
+</div>
+
+  </div>
+
+</footer>
+</body>
+
+</html>

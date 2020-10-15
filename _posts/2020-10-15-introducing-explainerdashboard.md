@@ -46,29 +46,29 @@ important to the model:
 
 ![](https://oegedijk.github.io/blog/images/explainerdashboard/tab_importances.png "importances tab")
 
-<!-- 
+
 Or how the model performs:
 
-![]({{ https://explainerdashboard.readthedocs.io }}en/latest/_images/tab_model_performance.png "model performance tab")
+![](https://oegedijk.github.io/blog/images/explainerdashboard/tab_model_performance.png "model performance tab")
 
 And you can explain how each individual feature contributed to each
 individual prediction:
 
-![]({{ https://explainerdashboard.readthedocs.io }}en/latest/_images/tab_individual_predictions.png "contributions tab")
+![](https://oegedijk.github.io/blog/images/explainerdashboard/tab_individual_predictions.png "contributions tab")
 
 Figure out how predictions would have changed if one or more of the variables
 were different:
 
-![]({{ https://explainerdashboard.readthedocs.io }}en/latest/_images/tab_whatif.png "whatif tab")
+![](https://oegedijk.github.io/blog/images/explainerdashboard/tab_whatif.png "whatif tab")
 
 See how feature impact predictions :
 
-![]({{ https://explainerdashboard.readthedocs.io }}en/latest/_images/tab_feature_dependence.png "feature dependence tab")
+![](https://oegedijk.github.io/blog/images/explainerdashboard/tab_feature_dependence.png "feature dependence tab")
 
 
 And even inspect every decision tree inside a random forest:
 
-![]({{ https://explainerdashboard.readthedocs.io }}en/latest/_images/tab_decision_trees.png "decisiontrees tab")
+![](https://oegedijk.github.io/blog/images/explainerdashboard/tab_decision_trees.png "decisiontrees tab")
 
 
 

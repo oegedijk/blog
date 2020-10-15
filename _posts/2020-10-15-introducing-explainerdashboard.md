@@ -39,7 +39,7 @@ ExplainerDashboard(explainer).run()
 This will launch a dashboard built on top off plotly `dash` that will run on
 `http://localhost:8050` by default. 
 
-https://explainerdashboard.readthedocs.io/en/latest/_images/tab_importances.png
+<!-- 
 
 With this dashboard you can for example see which features are the most 
 important to the model:
@@ -72,7 +72,7 @@ And even inspect every decision tree inside a random forest:
 
 
 
-
+ -->
 
 
 

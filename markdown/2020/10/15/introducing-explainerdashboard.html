@@ -126,7 +126,7 @@ window.onload = wrap_img;
 
 <p>With the <code class="highlighter-rouge">explainerdashboard</code> python package, building, deploying and sharing interactive dashboards
 that allow non-technical users to explore the inner workings of a machine learning model 
-can be done with just two lines of code. For example to build this example hosted at <a href="titanicexplainer.herokuapp.com/classifier">titanicexplainer.herokuapp.com/classifier</a>], you just to 
+can be done with just two lines of code. For example to build this example hosted at <a href="titanicexplainer.herokuapp.com/classifier">titanicexplainer.herokuapp.com/classifier</a>, you just to 
 need to fit a model:</p>
 
 <div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">sklearn.ensemble</span> <span class="kn">import</span> <span class="n">RandomForestClassifier</span>
@@ -152,13 +152,12 @@ need to fit a model:</p>
 <p>This will launch a dashboard built on top off plotly <code class="highlighter-rouge">dash</code> that will run on
 <code class="highlighter-rouge">http://localhost:8050</code> by default.</p>
 
+<p>With this dashboard you can for example see which features are the most 
+important to the model:</p>
+
+<p><img src="images/explainerdashboard/tab_importances.png" alt="" title="importances tab"></p>
+
 <!-- 
-
-With this dashboard you can for example see which features are the most 
-important to the model:
-
-![](en/latest/_images/tab_importances.png "importances tab")
-
 Or how the model performs:
 
 ![](en/latest/_images/tab_model_performance.png "model performance tab")

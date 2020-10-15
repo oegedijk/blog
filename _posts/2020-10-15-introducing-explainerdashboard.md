@@ -10,7 +10,7 @@ As data scientists working in a public or regulated sector we are under increasi
 
 With the `explainerdashboard` python package, building, deploying and sharing interactive dashboards
 that allow non-technical users to explore the inner workings of a machine learning model 
-can be done with just two lines of code. For example to build this example hosted at [titanicexplainer.herokuapp.com/classifier](titanicexplainer.herokuapp.com/classifier)], you just to 
+can be done with just two lines of code. For example to build this example hosted at [titanicexplainer.herokuapp.com/classifier](titanicexplainer.herokuapp.com/classifier), you just to 
 need to fit a model:
 
 ```python
@@ -39,13 +39,14 @@ ExplainerDashboard(explainer).run()
 This will launch a dashboard built on top off plotly `dash` that will run on
 `http://localhost:8050` by default. 
 
-<!-- 
+
 
 With this dashboard you can for example see which features are the most 
 important to the model:
 
-![]({{ https://explainerdashboard.readthedocs.io }}en/latest/_images/tab_importances.png "importances tab")
+![](images/explainerdashboard/tab_importances.png "importances tab")
 
+<!-- 
 Or how the model performs:
 
 ![]({{ https://explainerdashboard.readthedocs.io }}en/latest/_images/tab_model_performance.png "model performance tab")

@@ -44,7 +44,7 @@ This will launch a dashboard built on top off plotly `dash` that will run on
 With this dashboard you can for example see which features are the most 
 important to the model:
 
-![]({ site.baseurl }}/images/explainerdashboard/tab_importances.png "importances tab")
+![](https://oegedijk.github.io/blog/images/explainerdashboard/tab_importances.png "importances tab")
 
 <!-- 
 Or how the model performs:

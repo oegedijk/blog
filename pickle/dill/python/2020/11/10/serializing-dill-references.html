@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="twitter:card" content="summary" /><!-- Begin Jekyll SEO tag v2.6.1 -->
+<title>Serializing with dependencies in python | Data science explained</title>
+<meta name="generator" content="Jekyll v4.0.0" />
+<meta property="og:title" content="Serializing with dependencies in python" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="A tutorial on how to hack dill" />
+<meta property="og:description" content="A tutorial on how to hack dill" />
+<link rel="canonical" href="https://oegedijk.github.io/blog/pickle/dill/python/2020/11/10/serializing-dill-references.html" />
+<meta property="og:url" content="https://oegedijk.github.io/blog/pickle/dill/python/2020/11/10/serializing-dill-references.html" />
+<meta property="og:site_name" content="Data science explained" />
+<meta property="og:type" content="article" />
+<meta property="article:published_time" content="2020-11-10T00:00:00-06:00" />
+<script type="application/ld+json">
+{"description":"A tutorial on how to hack dill","@type":"BlogPosting","url":"https://oegedijk.github.io/blog/pickle/dill/python/2020/11/10/serializing-dill-references.html","dateModified":"2020-11-10T00:00:00-06:00","datePublished":"2020-11-10T00:00:00-06:00","headline":"Serializing with dependencies in python","mainEntityOfPage":{"@type":"WebPage","@id":"https://oegedijk.github.io/blog/pickle/dill/python/2020/11/10/serializing-dill-references.html"},"@context":"https://schema.org"}</script>
+<!-- End Jekyll SEO tag -->
+<link rel="stylesheet" href="/blog/assets/css/style.css"><link type="application/atom+xml" rel="alternate" href="https://oegedijk.github.io/blog/feed.xml" title="Data science explained" /><!-- the google_analytics_id gets auto inserted from the config file -->
+
+
+
+<script>(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)})(window,document,'script','//www.google-analytics.com/analytics.js','ga');ga('create','UA-21800815-2','auto');ga('require','displayfeatures');ga('send','pageview');</script>
+
+<link rel="shortcut icon" type="image/x-icon" href="/blog/images/favicon.ico"><!-- Begin Jekyll SEO tag v2.6.1 -->
+<title>Serializing with dependencies in python | Data science explained</title>
+<meta name="generator" content="Jekyll v4.0.0" />
+<meta property="og:title" content="Serializing with dependencies in python" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="A tutorial on how to hack dill" />
+<meta property="og:description" content="A tutorial on how to hack dill" />
+<link rel="canonical" href="https://oegedijk.github.io/blog/pickle/dill/python/2020/11/10/serializing-dill-references.html" />
+<meta property="og:url" content="https://oegedijk.github.io/blog/pickle/dill/python/2020/11/10/serializing-dill-references.html" />
+<meta property="og:site_name" content="Data science explained" />
+<meta property="og:type" content="article" />
+<meta property="article:published_time" content="2020-11-10T00:00:00-06:00" />
+<script type="application/ld+json">
+{"description":"A tutorial on how to hack dill","@type":"BlogPosting","url":"https://oegedijk.github.io/blog/pickle/dill/python/2020/11/10/serializing-dill-references.html","dateModified":"2020-11-10T00:00:00-06:00","datePublished":"2020-11-10T00:00:00-06:00","headline":"Serializing with dependencies in python","mainEntityOfPage":{"@type":"WebPage","@id":"https://oegedijk.github.io/blog/pickle/dill/python/2020/11/10/serializing-dill-references.html"},"@context":"https://schema.org"}</script>
+<!-- End Jekyll SEO tag -->
+
+<link href="https://unpkg.com/@primer/css/dist/primer.css" rel="stylesheet" />
+<link rel="stylesheet" href="//use.fontawesome.com/releases/v5.0.7/css/all.css"><link type="application/atom+xml" rel="alternate" href="https://oegedijk.github.io/blog/feed.xml" title="Data science explained" /><!-- the google_analytics_id gets auto inserted from the config file -->
+
+
+
+<script>(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)})(window,document,'script','//www.google-analytics.com/analytics.js','ga');ga('create','UA-21800815-2','auto');ga('require','displayfeatures');ga('send','pageview');</script>
+
+
+
+<script>
+function wrap_img(fn) {
+    if (document.attachEvent ? document.readyState === "complete" : document.readyState !== "loading") {
+        var elements = document.querySelectorAll(".post img");
+        Array.prototype.forEach.call(elements, function(el, i) {
+            if (el.getAttribute("title") && (el.className != "emoji")) {
+                const caption = document.createElement('figcaption');
+                var node = document.createTextNode(el.getAttribute("title"));
+                caption.appendChild(node);
+                const wrapper = document.createElement('figure');
+                wrapper.className = 'image';
+                el.parentNode.insertBefore(wrapper, el);
+                el.parentNode.removeChild(el);
+                wrapper.appendChild(el);
+                wrapper.appendChild(caption);
+            }
+        });
+    } else { document.addEventListener('DOMContentLoaded', fn); }
+}
+window.onload = wrap_img;
+</script>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function(){
+    // add link icon to anchor tags
+    var elem = document.querySelectorAll(".anchor-link")
+    elem.forEach(e => (e.innerHTML = '<i class="fas fa-link fa-xs"></i>'));
+    });
+</script>
+</head>
+<body><header class="site-header">
+
+  <div class="wrapper"><a class="site-title" rel="author" href="/blog/">Data science explained</a><nav class="site-nav">
+        <input type="checkbox" id="nav-trigger" class="nav-trigger" />
+        <label for="nav-trigger">
+          <span class="menu-icon">
+            <svg viewBox="0 0 18 15" width="18px" height="15px">
+              <path d="M18,1.484c0,0.82-0.665,1.484-1.484,1.484H1.484C0.665,2.969,0,2.304,0,1.484l0,0C0,0.665,0.665,0,1.484,0 h15.032C17.335,0,18,0.665,18,1.484L18,1.484z M18,7.516C18,8.335,17.335,9,16.516,9H1.484C0.665,9,0,8.335,0,7.516l0,0 c0-0.82,0.665-1.484,1.484-1.484h15.032C17.335,6.031,18,6.696,18,7.516L18,7.516z M18,13.516C18,14.335,17.335,15,16.516,15H1.484 C0.665,15,0,14.335,0,13.516l0,0c0-0.82,0.665-1.483,1.484-1.483h15.032C17.335,12.031,18,12.695,18,13.516L18,13.516z"/>
+            </svg>
+          </span>
+        </label>
+
+        <div class="trigger"><a class="page-link" href="/blog/about/">About Me</a><a class="page-link" href="/blog/search/">Search</a><a class="page-link" href="/blog/categories/">Tags</a></div>
+      </nav></div>
+</header>
+<main class="page-content" aria-label="Content">
+      <div class="wrapper">
+        <article class="post h-entry" itemscope itemtype="http://schema.org/BlogPosting">
+
+  <header class="post-header">
+    <h1 class="post-title p-name" itemprop="name headline">Serializing with dependencies in python</h1><p class="page-description">A tutorial on how to hack dill</p><p class="post-meta post-meta-title"><time class="dt-published" datetime="2020-11-10T00:00:00-06:00" itemprop="datePublished">
+        Nov 10, 2020
+      </time>
+       • <span class="read-time" title="Estimated read time">
+    
+    
+      5 min read
+    
+</span></p>
+
+    
+      <p class="category-tags"><i class="fas fa-tags category-tags-icon"></i></i> 
+      
+        <a class="category-tags-link" href="/blog/categories/#pickle">pickle</a>
+        &nbsp;
+      
+        <a class="category-tags-link" href="/blog/categories/#dill">dill</a>
+        &nbsp;
+      
+        <a class="category-tags-link" href="/blog/categories/#python">python</a>
+        
+      
+      </p>
+    
+
+    
+      
+        <div class="pb-5 d-flex flex-wrap flex-justify-end">
+          <div class="px-2">
+
+    <a href="https://github.com/oegedijk/blog/tree/master/_notebooks/2020-11-10-serializing-dill-references.ipynb" role="button" target="_blank">
+<img class="notebook-badge-image" src="/blog/assets/badges/github.svg" alt="View On GitHub">
+    </a>
+</div>
+
+          <div class="px-2">
+    <a href="https://mybinder.org/v2/gh/oegedijk/blog/master?filepath=_notebooks%2F2020-11-10-serializing-dill-references.ipynb" target="_blank">
+        <img class="notebook-badge-image" src="/blog/assets/badges/binder.svg" alt="Open In Binder"/>
+    </a>
+</div>
+
+          <div class="px-2">
+    <a href="https://colab.research.google.com/github/oegedijk/blog/blob/master/_notebooks/2020-11-10-serializing-dill-references.ipynb" target="_blank">
+        <img class="notebook-badge-image" src="/blog/assets/badges/colab.svg" alt="Open In Colab"/>
+    </a>
+</div>
+        </div>
+      </header>
+
+  <div class="post-content e-content" itemprop="articleBody">
+    <ul class="section-nav">
+<li class="toc-entry toc-h1"><a href="#Summary:">Summary: </a></li>
+<li class="toc-entry toc-h1"><a href="#Pickling-with-dependencies">Pickling with dependencies </a>
+<ul>
+<li class="toc-entry toc-h2"><a href="#solution-1:-also-store-the-module-with-defintions">solution 1: also store the module with defintions </a></li>
+<li class="toc-entry toc-h2"><a href="#Solution-2:-Dill-to-the-rescue!">Solution 2: Dill to the rescue! </a>
+<ul>
+<li class="toc-entry toc-h3"><a href="#But-only-stores-definitions-in-__main__-not-in-modules">But only stores definitions in __main__ not in modules </a></li>
+</ul>
+</li>
+<li class="toc-entry toc-h2"><a href="#Workaround:-move-definitions-to-__main__:">Workaround: move definitions to __main__: </a></li>
+<li class="toc-entry toc-h2"><a href="#Avoid-using-mainify-in-__main__">Avoid using mainify in __main__ </a>
+<ul>
+<li class="toc-entry toc-h3"><a href="#using-@classmethod">using @classmethod </a></li>
+<li class="toc-entry toc-h3"><a href="#using-__new__:">using __new__: </a></li>
+</ul>
+</li>
+<li class="toc-entry toc-h2"><a href="#Conclusion:">Conclusion: </a></li>
+</ul>
+</li>
+</ul><!--
+#################################################
+### THIS FILE WAS AUTOGENERATED! DO NOT EDIT! ###
+#################################################
+# file to edit: _notebooks/2020-11-10-serializing-dill-references.ipynb
+-->
+
+<div class="container" id="notebook-container">
+        
+    
+    
+<div class="cell border-box-sizing code_cell rendered">
+
+</div>
+    
+
+<div class="cell border-box-sizing text_cell rendered">
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h1 id="Summary:">
+<a class="anchor" href="#Summary:" aria-hidden="true"><span class="octicon octicon-link"></span></a>Summary:<a class="anchor-link" href="#Summary:"> </a>
+</h1>
+<p>If you wish to store (pickle) python objects into a single pickle file without accompanying modules with class/function definitions, you should:</p>
+<ol>
+<li>Use <code>dill</code> instead of <code>pickle</code>
+</li>
+<li>Use some tricks to trick <code>dill</code> into believing that imports have actually been defined in <code>__main__</code>
+</li>
+</ol>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered">
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h1 id="Pickling-with-dependencies">
+<a class="anchor" href="#Pickling-with-dependencies" aria-hidden="true"><span class="octicon octicon-link"></span></a>Pickling with dependencies<a class="anchor-link" href="#Pickling-with-dependencies"> </a>
+</h1>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered">
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>When you want to pickle a python object for long term storage, you can run into a problem: pickle does not store object definitions when it pickles. So for example when you build a <code>class Greeter</code> and then pickle it and unpickle it at another location, you already need to have <code>class Greeter</code> correctly defined before you can load the pickle at the target destination.</p>
+
+</div>
+</div>
+</div>
+    
+    
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="k">def</span> <span class="nf">greeting1</span><span class="p">():</span>
+    <span class="k">return</span> <span class="s2">"Booyaa!"</span>
+
+<span class="k">def</span> <span class="nf">greeting2</span><span class="p">():</span>
+    <span class="k">return</span> <span class="s2">"Howdy!"</span>
+
+<span class="k">class</span> <span class="nc">Greeter</span><span class="p">:</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">greetings</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">greetings</span> <span class="o">=</span> <span class="n">greetings</span>
+        
+    <span class="k">def</span> <span class="nf">greet</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">greet</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">greetings</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="n">greet</span><span class="p">())</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+</div>
+    
+
+    
+    
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="n">greeter</span> <span class="o">=</span> <span class="n">Greeter</span><span class="p">([</span><span class="n">greeting1</span><span class="p">,</span> <span class="n">greeting2</span><span class="p">])</span>
+<span class="n">greeter</span><span class="o">.</span><span class="n">greet</span><span class="p">()</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+<div class="output_area">
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre>Booyaa!
+Howdy!
+</pre>
+</div>
+</div>
+
+</div>
+</div>
+
+</div>
+    
+
+    
+    
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="kn">import</span> <span class="nn">pickle</span> 
+
+<span class="n">pickle</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">greeter</span><span class="p">,</span> <span class="nb">open</span><span class="p">(</span><span class="s2">"greeter.pkl"</span><span class="p">,</span> <span class="s2">"wb"</span><span class="p">))</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+</div>
+    
+
+<div class="cell border-box-sizing text_cell rendered">
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>If you now try to load the greeter somewhere else, you will get an <code>AttributeError</code>:</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered">
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="o">&gt;&gt;</span> <span class="kn">import</span> <span class="nn">pickle</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">pickle</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="nb">open</span><span class="p">(</span><span class="s2">"greeter.pkl"</span><span class="p">,</span> <span class="s2">"rb"</span><span class="p">))</span>
+<span class="n">Traceback</span> <span class="p">(</span><span class="n">most</span> <span class="n">recent</span> <span class="n">call</span> <span class="n">last</span><span class="p">):</span><span class="n">File</span> <span class="s2">"&lt;stdin&gt;"</span><span class="p">,</span> <span class="n">line</span> <span class="mi">1</span><span class="p">,</span> <span class="ow">in</span> <span class="o">&lt;</span><span class="n">module</span><span class="o">&gt;</span><span class="ne">AttributeError</span><span class="p">:</span> <span class="n">Can</span><span class="s1">'t get attribute '</span><span class="n">Greeter</span><span class="s1">' on &lt;module '</span><span class="n">__main__</span><span class="s1">' (built-in)&gt;</span>
+</pre></div>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered">
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="solution-1:-also-store-the-module-with-defintions">
+<a class="anchor" href="#solution-1:-also-store-the-module-with-defintions" aria-hidden="true"><span class="octicon octicon-link"></span></a>solution 1: also store the module with defintions<a class="anchor-link" href="#solution-1:-also-store-the-module-with-defintions"> </a>
+</h2>
+<p>One way around this by storing the class definition of <code>Greeter</code> in <code>greetings.py</code>, import <code>Greeter</code> from <code>greetings</code>, and copy <code>greetings.py</code> along with <code>greeter.pkl</code> to the location where you want to unpickle.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered">
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>However, now you have created a <strong>dependency</strong> that you need to manage. You always have to make sure that you have the right version of the right module at hand when you want to unpickle. Especially for long term storage of python objects, this is begging for problems. It would be nicer if you could have the object itself and the definition all in one file!</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered">
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="Solution-2:-Dill-to-the-rescue!">
+<a class="anchor" href="#Solution-2:-Dill-to-the-rescue!" aria-hidden="true"><span class="octicon octicon-link"></span></a>Solution 2: Dill to the rescue!<a class="anchor-link" href="#Solution-2:-Dill-to-the-rescue!"> </a>
+</h2>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered">
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Luckily there is a stand-in replacement for <code>pickle</code> called <code>dill</code> that unfortunately does not come with the standard library, so you have to install it yourself: <code>pip install dill</code>.</p>
+
+</div>
+</div>
+</div>
+    
+    
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">!</span>pip install dill
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+<div class="output_area">
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre>Requirement already satisfied: dill in /Users/oege/projects/blog/venv/lib/python3.8/site-packages (0.3.3)
+<span class="ansi-yellow-fg">WARNING: You are using pip version 20.1.1; however, version 20.2.4 is available.
+You should consider upgrading via the '/Users/oege/projects/blog/venv/bin/python -m pip install --upgrade pip' command.</span>
+</pre>
+</div>
+</div>
+
+</div>
+</div>
+
+</div>
+    
+
+<div class="cell border-box-sizing text_cell rendered">
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>The nice thing about <code>dill</code> is that it stores definitions along with the object, as long as they are defined in <code>__main__</code>. In our case they are so when we store the greeter instance with dill we can actually reload the object now:</p>
+
+</div>
+</div>
+</div>
+    
+    
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="kn">import</span> <span class="nn">dill</span>
+<span class="n">dill</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">greeter</span><span class="p">,</span> <span class="nb">open</span><span class="p">(</span><span class="s2">"greeter.pkl"</span><span class="p">,</span> <span class="s2">"wb"</span><span class="p">))</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+</div>
+    
+
+<div class="cell border-box-sizing text_cell rendered">
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<div class="highlight"><pre><span></span><span class="o">&gt;&gt;&gt;</span> <span class="kn">import</span> <span class="nn">dill</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">greeter</span> <span class="o">=</span> <span class="n">dill</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="nb">open</span><span class="p">(</span><span class="s2">"greeter.pkl"</span><span class="p">,</span> <span class="s2">"rb"</span><span class="p">))</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">greeter</span><span class="o">.</span><span class="n">greet</span><span class="p">()</span>
+<span class="n">Booyaa</span><span class="err">!</span>
+<span class="n">Howdy</span><span class="err">!</span>
+</pre></div>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered">
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>It worked!</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered">
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="But-only-stores-definitions-in-__main__-not-in-modules">
+<a class="anchor" href="#But-only-stores-definitions-in-__main__-not-in-modules" aria-hidden="true"><span class="octicon octicon-link"></span></a>But only stores definitions in <code>__main__</code> not in modules<a class="anchor-link" href="#But-only-stores-definitions-in-__main__-not-in-modules"> </a>
+</h3>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered">
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Suppose we define <code>Greeter</code> in a <code>greeter.py</code> module:</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered">
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p><strong>greeter.py</strong>:</p>
+<div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">greeting1</span><span class="p">():</span>
+    <span class="k">return</span> <span class="s2">"Booyaa!"</span>
+
+<span class="k">def</span> <span class="nf">greeting2</span><span class="p">():</span>
+    <span class="k">return</span> <span class="s2">"Howdy!"</span>
+
+<span class="k">class</span> <span class="nc">Greeter</span><span class="p">:</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">greetings</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">greetings</span> <span class="o">=</span> <span class="n">greetings</span>
+
+    <span class="k">def</span> <span class="nf">greet</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">greet</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">greetings</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="n">greet</span><span class="p">())</span>
+</pre></div>
+
+</div>
+</div>
+</div>
+    
+    
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="kn">import</span> <span class="nn">dill</span>
+<span class="kn">from</span> <span class="nn">greeter</span> <span class="kn">import</span> <span class="n">Greeter</span><span class="p">,</span> <span class="n">greeting1</span><span class="p">,</span> <span class="n">greeting2</span>
+
+<span class="n">g</span> <span class="o">=</span> <span class="n">Greeter</span><span class="p">([</span><span class="n">greeting1</span><span class="p">,</span> <span class="n">greeting2</span><span class="p">])</span>
+
+<span class="n">dill</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">g</span><span class="p">,</span> <span class="nb">open</span><span class="p">(</span><span class="s2">"greeter.pkl"</span><span class="p">,</span> <span class="s2">"wb"</span><span class="p">))</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+</div>
+    
+
+<div class="cell border-box-sizing text_cell rendered">
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Then the pickle again fails to load when <code>greetings.py</code> is either missing or misses the right definitions:</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered">
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<div class="highlight"><pre><span></span><span class="o">&gt;</span> <span class="o">&gt;&gt;</span> <span class="kn">import</span> <span class="nn">dill</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">greeter</span> <span class="o">=</span> <span class="n">dill</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="nb">open</span><span class="p">(</span><span class="s2">"_notebooks/greeter.pkl"</span><span class="p">,</span> <span class="s2">"rb"</span><span class="p">))</span>
+<span class="n">Traceback</span> <span class="p">(</span><span class="n">most</span> <span class="n">recent</span> <span class="n">call</span> <span class="n">last</span><span class="p">):</span><span class="n">File</span> <span class="s2">"&lt;stdin&gt;"</span><span class="p">,</span> <span class="n">line</span> <span class="mi">1</span><span class="p">,</span> <span class="ow">in</span> <span class="o">&lt;</span><span class="n">module</span><span class="o">&gt;</span>  <span class="n">File</span> <span class="s2">"/Users/oege/.pyenv/versions/3.8.5/lib/python3.8/site-packages/dill/_dill.py"</span><span class="p">,</span> <span class="n">line</span> <span class="mi">278</span><span class="p">,</span> <span class="ow">in</span> <span class="n">load</span>
+    <span class="k">return</span> <span class="n">Unpickler</span><span class="p">(</span><span class="n">file</span><span class="p">,</span> <span class="n">ignore</span><span class="o">=</span><span class="n">ignore</span><span class="p">,</span> <span class="o">**</span><span class="n">kwds</span><span class="p">)</span><span class="o">.</span><span class="n">load</span><span class="p">()</span>
+  <span class="n">File</span> <span class="s2">"/Users/oege/.pyenv/versions/3.8.5/lib/python3.8/site-packages/dill/_dill.py"</span><span class="p">,</span> <span class="n">line</span> <span class="mi">481</span><span class="p">,</span> <span class="ow">in</span> <span class="n">load</span>
+    <span class="n">obj</span> <span class="o">=</span> <span class="n">StockUnpickler</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+  <span class="n">File</span> <span class="s2">"/Users/oege/.pyenv/versions/3.8.5/lib/python3.8/site-packages/dill/_dill.py"</span><span class="p">,</span> <span class="n">line</span> <span class="mi">471</span><span class="p">,</span> <span class="ow">in</span> <span class="n">find_class</span>
+    <span class="k">return</span> <span class="n">StockUnpickler</span><span class="o">.</span><span class="n">find_class</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">module</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+<span class="ne">ModuleNotFoundError</span><span class="p">:</span> <span class="n">No</span> <span class="n">module</span> <span class="n">named</span> <span class="s1">'greeter'</span>
+</pre></div>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered">
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="Workaround:-move-definitions-to-__main__:">
+<a class="anchor" href="#Workaround:-move-definitions-to-__main__:" aria-hidden="true"><span class="octicon octicon-link"></span></a>Workaround: move definitions to <code>__main__</code>:<a class="anchor-link" href="#Workaround:-move-definitions-to-__main__:"> </a>
+</h2>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered">
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>You can work around this problem by <code>mainifying</code> the imported definitions:</p>
+
+</div>
+</div>
+</div>
+    
+    
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="kn">import</span> <span class="nn">dill</span>
+<span class="kn">from</span> <span class="nn">greeter</span> <span class="kn">import</span> <span class="n">Greeter</span><span class="p">,</span> <span class="n">greeting1</span><span class="p">,</span> <span class="n">greeting2</span>
+
+<span class="k">def</span> <span class="nf">mainify</span><span class="p">(</span><span class="n">obj</span><span class="p">):</span>
+    <span class="sd">"""If obj is not defined in __main__ then redefine it in </span>
+<span class="sd">    main so that dill will serialize the definition along with the object"""</span>
+    <span class="k">if</span> <span class="n">obj</span><span class="o">.</span><span class="vm">__module__</span> <span class="o">!=</span> <span class="s2">"__main__"</span><span class="p">:</span>
+        <span class="kn">import</span> <span class="nn">__main__</span>
+        <span class="kn">import</span> <span class="nn">inspect</span>
+        <span class="n">s</span> <span class="o">=</span> <span class="n">inspect</span><span class="o">.</span><span class="n">getsource</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span>
+        <span class="n">co</span> <span class="o">=</span> <span class="nb">compile</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="s1">'&lt;string&gt;'</span><span class="p">,</span> <span class="s1">'exec'</span><span class="p">)</span>
+        <span class="n">exec</span><span class="p">(</span><span class="n">co</span><span class="p">,</span> <span class="n">__main__</span><span class="o">.</span><span class="vm">__dict__</span><span class="p">)</span>
+           
+<span class="n">mainify</span><span class="p">(</span><span class="n">Greeter</span><span class="p">)</span>
+<span class="n">mainify</span><span class="p">(</span><span class="n">greeting1</span><span class="p">)</span>
+<span class="n">mainify</span><span class="p">(</span><span class="n">greeting2</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="n">Greeter</span><span class="o">.</span><span class="vm">__module__</span><span class="p">,</span> <span class="n">greeting1</span><span class="o">.</span><span class="vm">__module__</span><span class="p">,</span> <span class="n">greeting2</span><span class="o">.</span><span class="vm">__module__</span><span class="p">)</span>
+
+<span class="n">g</span> <span class="o">=</span> <span class="n">Greeter</span><span class="p">([</span><span class="n">greeting1</span><span class="p">,</span> <span class="n">greeting2</span><span class="p">])</span>
+
+<span class="n">dill</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">g</span><span class="p">,</span> <span class="nb">open</span><span class="p">(</span><span class="s2">"greeter.pkl"</span><span class="p">,</span> <span class="s2">"wb"</span><span class="p">))</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+<div class="output_area">
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre>__main__ __main__ __main__
+</pre>
+</div>
+</div>
+
+</div>
+</div>
+
+</div>
+    
+
+<div class="cell border-box-sizing text_cell rendered">
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>And this works:</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered">
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<div class="highlight"><pre><span></span><span class="o">&gt;&gt;&gt;</span> <span class="kn">import</span> <span class="nn">dill</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">greeter</span> <span class="o">=</span> <span class="n">dill</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="nb">open</span><span class="p">(</span><span class="s2">"_notebooks/greeter.pkl"</span><span class="p">,</span> <span class="s2">"rb"</span><span class="p">))</span>
+<span class="o">&gt;&gt;&gt;</span> <span class="n">greeter</span><span class="o">.</span><span class="n">greet</span><span class="p">()</span>
+<span class="n">Booyaa</span><span class="err">!</span>
+<span class="n">Howdy</span><span class="err">!</span>
+</pre></div>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered">
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="Avoid-using-mainify-in-__main__">
+<a class="anchor" href="#Avoid-using-mainify-in-__main__" aria-hidden="true"><span class="octicon octicon-link"></span></a>Avoid using <code>mainify</code> in <code>__main__</code><a class="anchor-link" href="#Avoid-using-mainify-in-__main__"> </a>
+</h2>
+<p>It is a bit cumbersome to <code>mainify</code> everything though, and you may wish to automate this for your users.</p>
+<p>One way of doing this is by declaring a classmethod <code>dillable</code>:</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered">
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="using-@classmethod">
+<a class="anchor" href="#using-@classmethod" aria-hidden="true"><span class="octicon octicon-link"></span></a>using <code>@classmethod</code><a class="anchor-link" href="#using-@classmethod"> </a>
+</h3>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered">
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p><strong>greeter2.py</strong>:</p>
+<div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">Greeting</span><span class="p">:</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">greetings</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">greetings</span> <span class="o">=</span> <span class="n">greetings</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">dillable</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">greetings</span><span class="p">):</span>
+        <span class="kn">import</span> <span class="nn">__main__</span>
+        <span class="k">for</span> <span class="n">greeting</span> <span class="ow">in</span> <span class="n">greetings</span><span class="p">:</span>
+            <span class="bp">cls</span><span class="o">.</span><span class="n">_mainify</span><span class="p">(</span><span class="n">greeting</span><span class="p">)</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">_mainify</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span>
+        <span class="bp">cls</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">__main__</span><span class="p">,</span> <span class="bp">cls</span><span class="o">.</span><span class="vm">__name__</span><span class="p">)</span>
+        <span class="n">greetings</span> <span class="o">=</span> <span class="p">[</span><span class="nb">getattr</span><span class="p">(</span><span class="n">__main__</span><span class="p">,</span> <span class="n">greeting</span><span class="o">.</span><span class="vm">__name__</span><span class="p">)</span> <span class="k">for</span> <span class="n">greeting</span> <span class="ow">in</span> <span class="n">greetings</span><span class="p">]</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">greetings</span><span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_mainify</span><span class="p">(</span><span class="n">obj</span><span class="p">):</span>
+        <span class="sd">"""If obj is not defined in __main__ then redefine it in </span>
+<span class="sd">        main so that dill will serialize the definition along with the object"""</span>
+        <span class="k">if</span> <span class="n">obj</span><span class="o">.</span><span class="vm">__module__</span> <span class="o">!=</span> <span class="s2">"__main__"</span><span class="p">:</span>
+            <span class="kn">import</span> <span class="nn">__main__</span>
+            <span class="kn">import</span> <span class="nn">inspect</span>
+            <span class="n">s</span> <span class="o">=</span> <span class="n">inspect</span><span class="o">.</span><span class="n">getsource</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span>
+            <span class="n">co</span> <span class="o">=</span> <span class="nb">compile</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="s1">'&lt;string&gt;'</span><span class="p">,</span> <span class="s1">'exec'</span><span class="p">)</span>
+            <span class="n">exec</span><span class="p">(</span><span class="n">co</span><span class="p">,</span> <span class="n">__main__</span><span class="o">.</span><span class="vm">__dict__</span><span class="p">)</span>
+</pre></div>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered">
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Now you can import in main:</p>
+
+</div>
+</div>
+</div>
+    
+    
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="kn">import</span> <span class="nn">dill</span>
+<span class="kn">from</span> <span class="nn">greeter2</span> <span class="kn">import</span> <span class="n">Greeter</span><span class="p">,</span> <span class="n">greeting1</span><span class="p">,</span> <span class="n">greeting2</span>
+
+<span class="n">g</span> <span class="o">=</span> <span class="n">Greeter</span><span class="o">.</span><span class="n">dillable</span><span class="p">([</span><span class="n">greeting1</span><span class="p">,</span> <span class="n">greeting2</span><span class="p">])</span>
+<span class="n">g</span><span class="o">.</span><span class="n">greet</span><span class="p">()</span>
+
+<span class="n">dill</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">g</span><span class="p">,</span> <span class="nb">open</span><span class="p">(</span><span class="s2">"greeter.pkl"</span><span class="p">,</span> <span class="s2">"wb"</span><span class="p">))</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+<div class="output_area">
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre>Booyaa!
+Howdy!
+</pre>
+</div>
+</div>
+
+</div>
+</div>
+
+</div>
+    
+
+<div class="cell border-box-sizing text_cell rendered">
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="using-__new__:">
+<a class="anchor" href="#using-__new__:" aria-hidden="true"><span class="octicon octicon-link"></span></a>using <code>__new__</code>:<a class="anchor-link" href="#using-__new__:"> </a>
+</h3>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered">
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p><strong><em>greeter3.py</em></strong>:</p>
+<div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">Greeting</span><span class="p">:</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">greetings</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">greetings</span> <span class="o">=</span> <span class="n">greetings</span>
+
+    <span class="k">def</span> <span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">greetings</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>         
+        <span class="kn">import</span> <span class="nn">__main__</span>
+
+        <span class="k">if</span> <span class="n">greetings</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">cls</span><span class="o">.</span><span class="n">_mainify</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span>
+            <span class="bp">cls</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">__main__</span><span class="p">,</span> <span class="bp">cls</span><span class="o">.</span><span class="vm">__name__</span><span class="p">)</span>
+
+        <span class="n">obj</span> <span class="o">=</span> <span class="nb">object</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">greetings</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">greeting</span> <span class="ow">in</span> <span class="n">greetings</span><span class="p">:</span>
+                <span class="bp">cls</span><span class="o">.</span><span class="n">_mainify</span><span class="p">(</span><span class="n">greeting</span><span class="p">)</span>
+            <span class="n">greetings</span> <span class="o">=</span> <span class="p">[</span><span class="nb">getattr</span><span class="p">(</span><span class="n">__main__</span><span class="p">,</span> <span class="n">greeting</span><span class="o">.</span><span class="vm">__name__</span><span class="p">)</span> <span class="k">for</span> <span class="n">greeting</span> <span class="ow">in</span> <span class="n">greetings</span><span class="p">]</span>
+            <span class="n">obj</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">greetings</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">obj</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_mainify</span><span class="p">(</span><span class="n">obj</span><span class="p">):</span>
+        <span class="sd">"""If obj is not defined in __main__ then redefine it in </span>
+<span class="sd">        main so that dill will serialize the definition along with the object"""</span>
+        <span class="k">if</span> <span class="n">obj</span><span class="o">.</span><span class="vm">__module__</span> <span class="o">!=</span> <span class="s2">"__main__"</span><span class="p">:</span>
+            <span class="kn">import</span> <span class="nn">__main__</span>
+            <span class="kn">import</span> <span class="nn">inspect</span>
+            <span class="n">s</span> <span class="o">=</span> <span class="n">inspect</span><span class="o">.</span><span class="n">getsource</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span>
+            <span class="n">co</span> <span class="o">=</span> <span class="nb">compile</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="s1">'&lt;string&gt;'</span><span class="p">,</span> <span class="s1">'exec'</span><span class="p">)</span>
+            <span class="n">exec</span><span class="p">(</span><span class="n">co</span><span class="p">,</span> <span class="n">__main__</span><span class="o">.</span><span class="vm">__dict__</span><span class="p">)</span>
+</pre></div>
+
+</div>
+</div>
+</div>
+    
+    
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="kn">import</span> <span class="nn">dill</span>
+<span class="kn">from</span> <span class="nn">greeter3</span> <span class="kn">import</span> <span class="n">Greeter</span><span class="p">,</span> <span class="n">greeting1</span><span class="p">,</span> <span class="n">greeting2</span>
+
+<span class="n">g</span> <span class="o">=</span> <span class="n">Greeter</span><span class="p">([</span><span class="n">greeting1</span><span class="p">,</span> <span class="n">greeting2</span><span class="p">])</span>
+<span class="n">g</span><span class="o">.</span><span class="n">greet</span><span class="p">()</span>
+
+<span class="n">dill</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">g</span><span class="p">,</span> <span class="nb">open</span><span class="p">(</span><span class="s2">"greeter.pkl"</span><span class="p">,</span> <span class="s2">"wb"</span><span class="p">))</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+<div class="output_area">
+
+<div class="output_subarea output_stream output_stdout output_text">
+<pre>Booyaa!
+Howdy!
+</pre>
+</div>
+</div>
+
+</div>
+</div>
+
+</div>
+    
+
+<div class="cell border-box-sizing text_cell rendered">
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2 id="Conclusion:">
+<a class="anchor" href="#Conclusion:" aria-hidden="true"><span class="octicon octicon-link"></span></a>Conclusion:<a class="anchor-link" href="#Conclusion:"> </a>
+</h2>
+<p>This looks hacky, and probably is, but hope it may be useful to some of you!</p>
+
+</div>
+</div>
+</div>
+</div>
+
+
+
+  </div><!-- from https://github.com/utterance/utterances -->
+<script src="https://utteranc.es/client.js"
+        repo="oegedijk/blog"
+        issue-term="title"
+        label="blogpost-comment"
+        theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script><a class="u-url" href="/blog/pickle/dill/python/2020/11/10/serializing-dill-references.html" hidden></a>
+</article>
+      </div>
+    </main><footer class="site-footer h-card">
+  <data class="u-url" href="/blog/"></data>
+
+  <div class="wrapper">
+
+    <div class="footer-col-wrapper">
+      <div class="footer-col">
+        <p class="feed-subscribe">
+          <a href="/blog/feed.xml">
+            <svg class="svg-icon orange">
+              <use xlink:href="/blog/assets/minima-social-icons.svg#rss"></use>
+            </svg><span>Subscribe</span>
+          </a>
+        </p>
+      </div>
+      <div class="footer-col">
+        <p>A blog about data science, explainable AI, python tricks and more</p>
+      </div>
+    </div>
+
+    <div class="social-links"><ul class="social-media-list"><li><a rel="me" href="https://github.com/oegedijk" title="oegedijk"><svg class="svg-icon grey"><use xlink:href="/blog/assets/minima-social-icons.svg#github"></use></svg></a></li><li><a rel="me" href="https://twitter.com/oegedijk" title="oegedijk"><svg class="svg-icon grey"><use xlink:href="/blog/assets/minima-social-icons.svg#twitter"></use></svg></a></li></ul>
+</div>
+
+  </div>
+
+</footer>
+</body>
+
+</html>
